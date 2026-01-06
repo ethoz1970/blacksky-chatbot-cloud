@@ -4,3 +4,4 @@ python-dotenv>=1.0.0
 together>=1.0.0
 pinecone>=3.0.0
 sentence-transformers>=2.2.0
+python-multipart>=0.0.6

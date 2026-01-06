@@ -104,13 +104,47 @@
       padding-top: 0;
     }
 
+    .message-image-wrapper {
+      margin-bottom: 24px;
+      border: 1px solid #222;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #111;
+    }
+
     .message-image {
       display: block;
-      max-width: 120px;
+      width: 100%;
       height: auto;
-      margin-bottom: 16px;
       opacity: 0.9;
-      border-radius: 4px;
+      transition: opacity 0.2s;
+    }
+
+    .message-image:hover {
+      opacity: 1;
+    }
+
+    .message-image-meta {
+      padding: 12px 16px;
+      border-top: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .message-image-category {
+      font-size: 0.625rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #555;
+      background: #1a1a1a;
+      padding: 4px 8px;
+      border-radius: 2px;
+    }
+
+    .message-image-caption {
+      font-size: 0.75rem;
+      color: #666;
     }
 
     .typing-indicator {
@@ -286,27 +320,28 @@
       const lower = text.toLowerCase();
       
       // Federal agencies
-      if (lower.includes('treasury')) return { src: '/static/images/treasury.png', alt: 'Treasury Department' };
-      if (lower.includes('nih') || lower.includes('national institute')) return { src: '/static/images/nih.png', alt: 'NIH' };
-      if (lower.includes('fda')) return { src: '/static/images/fda.png', alt: 'FDA' };
-      if (lower.includes('usda') || lower.includes('fsis') || lower.includes('food safety')) return { src: '/static/images/usda.png', alt: 'USDA' };
-      if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/dot.png', alt: 'Department of Transportation' };
-      if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'SEC' };
-      if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'HHS' };
-      if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID' };
+      if (lower.includes('treasury')) return { src: '/static/images/treasury.png', alt: 'U.S. Department of Treasury', category: 'Federal Agency' };
+      if (lower.includes('nih') || lower.includes('national institute of health')) return { src: '/static/images/nih.png', alt: 'National Institutes of Health', category: 'Federal Agency' };
+      if (lower.includes('fda')) return { src: '/static/images/fda.png', alt: 'Food & Drug Administration', category: 'Federal Agency' };
+      if (lower.includes('usda') || lower.includes('fsis') || lower.includes('food safety')) return { src: '/static/images/usda.png', alt: 'USDA Food Safety', category: 'Federal Agency' };
+      if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/dot.png', alt: 'Department of Transportation', category: 'Federal Agency' };
+      if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'Securities & Exchange Commission', category: 'Federal Agency' };
+      if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'Health & Human Services', category: 'Federal Agency' };
+      if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID', category: 'Federal Agency' };
       
       // Companies
-      if (lower.includes('vanguard')) return { src: '/static/images/vanguard.png', alt: 'Vanguard' };
-      if (lower.includes('mastercard')) return { src: '/static/images/mastercard.png', alt: 'Mastercard' };
-      if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield' };
-      if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank' };
-      if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard' };
+      if (lower.includes('vanguard')) return { src: '/static/images/vanguard.png', alt: 'Vanguard', category: 'Enterprise Client' };
+      if (lower.includes('mastercard')) return { src: '/static/images/mastercard.png', alt: 'Mastercard', category: 'Enterprise Client' };
+      if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield', category: 'Enterprise Client' };
+      if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank', category: 'International' };
+      if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard', category: 'Media' };
+      if (lower.includes('national gallery') || lower.includes('art gallery')) return { src: '/static/images/nga.png', alt: 'National Gallery of Art', category: 'Cultural Institution' };
       
       // Technologies
-      if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal' };
-      if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes' };
-      if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Azure' };
-      if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'AWS' };
+      if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal', category: 'Technology' };
+      if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes', category: 'Technology' };
+      if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Microsoft Azure', category: 'Cloud Platform' };
+      if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'Amazon Web Services', category: 'Cloud Platform' };
       
       return null;
     }
@@ -371,7 +406,15 @@
       if (sender === 'bot') {
         const image = getImageForTopic(text);
         if (image) {
-          imageHtml = `<img src="${image.src}" alt="${image.alt}" class="message-image" onerror="this.style.display='none'">`;
+          imageHtml = `
+            <div class="message-image-wrapper">
+              <img src="${image.src}" alt="${image.alt}" class="message-image" onerror="this.parentElement.style.display='none'">
+              <div class="message-image-meta">
+                <span class="message-image-category">${image.category}</span>
+                <span class="message-image-caption">${image.alt}</span>
+              </div>
+            </div>
+          `;
         }
       }
       
