@@ -24,8 +24,35 @@
     }
 
     .header {
+      position: sticky;
+      top: 0;
+      background: #0a0a0a;
       padding: 24px 32px;
       border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 100;
+    }
+
+    .hamburger {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .hamburger span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: #666;
+      transition: background 0.15s;
+    }
+
+    .hamburger:hover span {
+      background: #e0e0e0;
     }
 
     .header-title {
@@ -34,6 +61,116 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: #666;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .header-title:hover {
+      color: #e0e0e0;
+    }
+
+    /* Left Menu Slideout */
+    .menu-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+      z-index: 900;
+    }
+
+    .menu-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .menu-panel {
+      position: fixed;
+      top: 0;
+      left: -280px;
+      width: 280px;
+      height: 100%;
+      background: #0a0a0a;
+      border-right: 1px solid #222;
+      transition: left 0.3s ease;
+      z-index: 901;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .menu-panel.active {
+      left: 0;
+    }
+
+    .menu-header {
+      padding: 24px;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .menu-title {
+      font-size: 0.6875rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #666;
+    }
+
+    .menu-close {
+      background: none;
+      border: 1px solid #333;
+      color: #666;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .menu-close:hover {
+      border-color: #e0e0e0;
+      color: #e0e0e0;
+    }
+
+    .menu-items {
+      flex: 1;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .menu-item {
+      font-size: 1.5rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: #444;
+      cursor: pointer;
+      padding: 16px 0;
+      border-bottom: 1px solid #1a1a1a;
+      transition: color 0.15s;
+    }
+
+    .menu-item:hover {
+      color: #e0e0e0;
+    }
+
+    .menu-footer {
+      padding: 24px;
+      border-top: 1px solid #222;
+      font-size: 0.6875rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #333;
     }
 
     .chat-container {
@@ -245,11 +382,167 @@
         padding-right: 20px;
       }
     }
+
+    /* Slideout Panel */
+    .slideout-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+      z-index: 1000;
+    }
+
+    .slideout-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .slideout-panel {
+      position: fixed;
+      top: 0;
+      right: -500px;
+      width: 100%;
+      max-width: 500px;
+      height: 100%;
+      background: #0a0a0a;
+      border-left: 1px solid #222;
+      transition: right 0.3s ease;
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slideout-panel.active {
+      right: 0;
+    }
+
+    .slideout-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .slideout-title {
+      font-size: 0.6875rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #666;
+    }
+
+    .slideout-close {
+      background: none;
+      border: 1px solid #333;
+      color: #666;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slideout-close:hover {
+      border-color: #e0e0e0;
+      color: #e0e0e0;
+    }
+
+    .slideout-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 24px;
+    }
+
+    .slideout-content p {
+      margin-bottom: 16px;
+      line-height: 1.7;
+      font-size: 0.9375rem;
+    }
+
+    .slideout-content .section-title {
+      color: #888;
+      border-bottom: 1px solid #333;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      margin-top: 24px;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .slideout-content .section-title:first-child {
+      margin-top: 0;
+    }
+
+    .slideout-image {
+      width: 100%;
+      height: auto;
+      border-radius: 4px;
+      border: 1px solid #222;
+      margin-bottom: 24px;
+      opacity: 0.9;
+    }
+
+    .message-image-wrapper {
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .message-image-wrapper:hover {
+      border-color: #444;
+    }
+
+    .inline-link {
+      color: #888;
+      border-bottom: 1px solid #444;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .inline-link:hover {
+      color: #e0e0e0;
+      border-color: #e0e0e0;
+    }
+
+    @media (max-width: 640px) {
+      .slideout-panel {
+        max-width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="header-title">Blacksky</div>
+    <div class="hamburger" id="menuToggle">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <div class="header-title" id="menuToggleTitle">Blacksky</div>
+  </div>
+
+  <!-- Left Menu Panel -->
+  <div class="menu-overlay" id="menuOverlay"></div>
+  <div class="menu-panel" id="menuPanel">
+    <div class="menu-header">
+      <span class="menu-title">Menu</span>
+      <button class="menu-close" id="menuClose">×</button>
+    </div>
+    <div class="menu-items">
+      <div class="menu-item" data-panel-key="who">WHO</div>
+      <div class="menu-item" data-panel-key="what">WHAT</div>
+      <div class="menu-item" data-panel-key="why">WHY</div>
+    </div>
+    <div class="menu-footer">Blacksky LLC © 2025</div>
   </div>
 
   <div class="chat-container">
@@ -270,7 +563,7 @@
 
           <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› What We Do</span></p>
           
-          <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like Treasury, NIH, FDA, and DOT. Fortune 500 companies like Vanguard and Mastercard. Systems that serve millions of users and handle mission-critical data.</p>
+          <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like <span class="inline-link" data-panel-key="treasury">Treasury</span>, <span class="inline-link" data-panel-key="nih">NIH</span>, <span class="inline-link" data-panel-key="fda">FDA</span>, and DOT. Fortune 500 companies like <span class="inline-link" data-panel-key="vanguard">Vanguard</span> and <span class="inline-link" data-panel-key="mastercard">Mastercard</span>. Systems that serve millions of users and handle mission-critical data.</p>
           
           <p>Our work spans the full stack: cloud infrastructure, distributed systems, API design, AI integration, and complex migrations. We've led 15+ large-scale platform modernizations—SharePoint to Drupal, monoliths to microservices, legacy systems to cloud-native architectures.</p>
 
@@ -284,7 +577,7 @@
           
           <p>The systems we build affect real people. A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. This isn't abstract—it's responsibility.</p>
           
-          <p>We also believe technology should serve democracy, not just commerce. Our civic technology work, including projects like Poly Sci Fi, reflects a commitment to using these same enterprise-grade capabilities to make government more transparent and participation more accessible.</p>
+          <p>We also believe technology should serve democracy, not just commerce. Our civic technology work, including projects like Poly Sci Fi, reflects a commitment to using these same enterprise-grade capabilities to make government more transparent and participation more accessible. <span class="inline-link" data-panel-key="mission">Read our mission ›</span></p>
 
           <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› The Name</span></p>
           
@@ -307,6 +600,17 @@
     </div>
   </div>
 
+  <!-- Slideout Panel -->
+  <div class="slideout-overlay" id="slideoutOverlay"></div>
+  <div class="slideout-panel" id="slideoutPanel">
+    <div class="slideout-header">
+      <span class="slideout-title" id="slideoutTitle">Details</span>
+      <button class="slideout-close" id="slideoutClose">×</button>
+    </div>
+    <div class="slideout-content" id="slideoutContent">
+    </div>
+  </div>
+
   <script>
     const API_HOST = window.location.origin;
     const messages = document.getElementById('messages');
@@ -319,29 +623,147 @@
     function getImageForTopic(text) {
       const lower = text.toLowerCase();
       
+      // Define panel content for each topic
+      const panels = {
+        treasury: {
+          title: 'Treasury Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky architected and executed migration of 6 mission-critical SharePoint sites to a unified Drupal 8 platform for treasury.gov, consolidating fragmented content systems into a cohesive digital ecosystem.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed enterprise content architecture supporting treasury.gov and 5 subsidiary sites, used by 200+ content creators.</p>
+            <p>Built custom migration framework successfully migrating 15,000+ documents and pages with 98% content fidelity.</p>
+            <p>Reduced deployment time from 3 days to 4 hours through CI/CD pipeline improvements.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 8, PHP, XML processing, Acquia Cloud, custom ETL tools</p>
+          `
+        },
+        nih: {
+          title: 'NIH Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky architected a migration from Drupal 8 to Drupal 10 for the National Institute of Nursing Research, requiring federal security clearance and compliance with strict government security protocols.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed FISMA-compliant architecture meeting NIH security standards and federal data protection requirements.</p>
+            <p>Architected custom integration layer connecting NIH research databases with public-facing website.</p>
+            <p>Implemented Apache Solr search infrastructure enabling complex research publication queries.</p>
+            
+            <div class="section-title">› Security</div>
+            <p>NIH background check and facility badge required.</p>
+          `
+        },
+        fda: {
+          title: 'FDA Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky contributed to FDA platform enhancements supporting regulatory requirements through Phase2.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
+          `
+        },
+        usda: {
+          title: 'USDA FSIS Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky led the architectural design and implementation of an enterprise-scale Drupal 10 platform modernization for the USDA Food Safety and Inspection Service, focusing on high-availability infrastructure and AI-powered content services.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed and implemented Redis Cluster architecture on Azure Kubernetes Service, improving application response times by 70%.</p>
+            <p>Architected AI-powered translation service enabling real-time multilingual content delivery across 15+ languages.</p>
+            <p>Established Kubernetes deployment pipeline with automated scaling, reducing infrastructure costs by 40%.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 10, PHP, Kubernetes, Redis Cluster, Azure Cloud, Apache Solr, AI integration</p>
+          `
+        },
+        vanguard: {
+          title: 'Vanguard Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky led technical transformation from monolithic Drupal 8 to headless architecture, decoupling content management from presentation layer for multi-channel content delivery.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed and implemented RESTful API layer serving content to Angular frontend.</p>
+            <p>Architected content export system reducing API response times by 40%.</p>
+            <p>Led Drupal 8 to 9 upgrade while simultaneously implementing headless architecture without service interruption.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, RESTful APIs, JSON, Angular, Acquia Cloud, AWS, PHPUnit</p>
+          `
+        },
+        mastercard: {
+          title: 'Mastercard Project',
+          content: `
+            <img src="/static/images/mastercard.png" alt="Mastercard" class="slideout-image" onerror="this.style.display='none'">
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky built a custom bulk upload system for Mastercard enabling efficient file processing and content management.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Built custom Drupal 9 module enabling bulk upload of hundreds of files with automated validation.</p>
+            <p>Designed file processing pipeline including unzip functionality, naming convention verification, and automated node creation.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
+          `
+        },
+        mission: {
+          title: 'Our Mission',
+          content: `
+            <div class="section-title">› What We Believe</div>
+            <p>Blacksky believes technology should empower people, not just corporations.</p>
+            <p>While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation.</p>
+            
+            <div class="section-title">› Civic Technology</div>
+            <p>Our flagship project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials.</p>
+            
+            <div class="section-title">› Our Values</div>
+            <p>We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.</p>
+            <p>Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged.</p>
+          `
+        },
+        about: {
+          title: 'About Blacksky',
+          content: `
+            <div class="section-title">› Origin</div>
+            <p>Blacksky started the way most good things do—with curiosity and a blinking cursor. Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. That obsession never faded. It just evolved.</p>
+            <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft.</p>
+            
+            <div class="section-title">› What We Do</div>
+            <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like Treasury, NIH, FDA, and DOT. Fortune 500 companies like Vanguard and Mastercard.</p>
+            
+            <div class="section-title">› The Name</div>
+            <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible. It's potential—quiet, vast, and ready.</p>
+          `
+        }
+      };
+      
       // Federal agencies
-      if (lower.includes('treasury')) return { src: '/static/images/treasury.png', alt: 'U.S. Department of Treasury', category: 'Federal Agency' };
-      if (lower.includes('nih') || lower.includes('national institute of health')) return { src: '/static/images/nih.png', alt: 'National Institutes of Health', category: 'Federal Agency' };
-      if (lower.includes('fda')) return { src: '/static/images/fda.png', alt: 'Food & Drug Administration', category: 'Federal Agency' };
-      if (lower.includes('usda') || lower.includes('fsis') || lower.includes('food safety')) return { src: '/static/images/usda.png', alt: 'USDA Food Safety', category: 'Federal Agency' };
-      if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/dot.png', alt: 'Department of Transportation', category: 'Federal Agency' };
-      if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'Securities & Exchange Commission', category: 'Federal Agency' };
-      if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'Health & Human Services', category: 'Federal Agency' };
-      if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID', category: 'Federal Agency' };
+      if (lower.includes('treasury')) return { src: '/static/images/treasury.png', alt: 'U.S. Department of Treasury', category: 'Federal Agency', panel: panels.treasury };
+      if (lower.includes('nih') || lower.includes('national institute of health')) return { src: '/static/images/nih.png', alt: 'National Institutes of Health', category: 'Federal Agency', panel: panels.nih };
+      if (lower.includes('fda')) return { src: '/static/images/fda.png', alt: 'Food & Drug Administration', category: 'Federal Agency', panel: panels.fda };
+      if (lower.includes('usda') || lower.includes('fsis') || lower.includes('food safety')) return { src: '/static/images/usda.png', alt: 'USDA Food Safety', category: 'Federal Agency', panel: panels.usda };
+      if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/dot.png', alt: 'Department of Transportation', category: 'Federal Agency', panel: null };
+      if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'Securities & Exchange Commission', category: 'Federal Agency', panel: null };
+      if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'Health & Human Services', category: 'Federal Agency', panel: null };
+      if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID', category: 'Federal Agency', panel: null };
       
       // Companies
-      if (lower.includes('vanguard')) return { src: '/static/images/vanguard.png', alt: 'Vanguard', category: 'Enterprise Client' };
-      if (lower.includes('mastercard')) return { src: '/static/images/mastercard.png', alt: 'Mastercard', category: 'Enterprise Client' };
-      if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield', category: 'Enterprise Client' };
-      if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank', category: 'International' };
-      if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard', category: 'Media' };
-      if (lower.includes('national gallery') || lower.includes('art gallery')) return { src: '/static/images/nga.png', alt: 'National Gallery of Art', category: 'Cultural Institution' };
+      if (lower.includes('vanguard')) return { src: '/static/images/vanguard.png', alt: 'Vanguard', category: 'Enterprise Client', panel: panels.vanguard };
+      if (lower.includes('mastercard')) return { src: '/static/images/mastercard.png', alt: 'Mastercard', category: 'Enterprise Client', panel: panels.mastercard };
+      if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield', category: 'Enterprise Client', panel: null };
+      if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank', category: 'International', panel: null };
+      if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard', category: 'Media', panel: null };
+      if (lower.includes('national gallery') || lower.includes('art gallery')) return { src: '/static/images/nga.png', alt: 'National Gallery of Art', category: 'Cultural Institution', panel: null };
       
       // Technologies
-      if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal', category: 'Technology' };
-      if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes', category: 'Technology' };
-      if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Microsoft Azure', category: 'Cloud Platform' };
-      if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'Amazon Web Services', category: 'Cloud Platform' };
+      if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal', category: 'Technology', panel: null };
+      if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes', category: 'Technology', panel: null };
+      if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Microsoft Azure', category: 'Cloud Platform', panel: null };
+      if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'Amazon Web Services', category: 'Cloud Platform', panel: null };
       
       return null;
     }
@@ -406,12 +828,14 @@
       if (sender === 'bot') {
         const image = getImageForTopic(text);
         if (image) {
+          const clickable = image.panel ? 'data-panel="' + btoa(JSON.stringify(image.panel)) + '"' : '';
+          const clickClass = image.panel ? 'clickable' : '';
           imageHtml = `
-            <div class="message-image-wrapper">
+            <div class="message-image-wrapper ${clickClass}" ${clickable}>
               <img src="${image.src}" alt="${image.alt}" class="message-image" onerror="this.parentElement.style.display='none'">
               <div class="message-image-meta">
                 <span class="message-image-category">${image.category}</span>
-                <span class="message-image-caption">${image.alt}</span>
+                <span class="message-image-caption">${image.alt}${image.panel ? ' ›' : ''}</span>
               </div>
             </div>
           `;
@@ -492,6 +916,225 @@
     });
 
     input.focus();
+
+    // Slideout panel functionality
+    const slideoutOverlay = document.getElementById('slideoutOverlay');
+    const slideoutPanel = document.getElementById('slideoutPanel');
+    const slideoutTitle = document.getElementById('slideoutTitle');
+    const slideoutContent = document.getElementById('slideoutContent');
+    const slideoutClose = document.getElementById('slideoutClose');
+
+    function openPanel(panelData) {
+      slideoutTitle.textContent = panelData.title;
+      slideoutContent.innerHTML = panelData.content;
+      slideoutOverlay.classList.add('active');
+      slideoutPanel.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closePanel() {
+      slideoutOverlay.classList.remove('active');
+      slideoutPanel.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    slideoutClose.addEventListener('click', closePanel);
+    slideoutOverlay.addEventListener('click', closePanel);
+
+    // Handle clicks on images with panels
+    document.addEventListener('click', (e) => {
+      const wrapper = e.target.closest('.message-image-wrapper.clickable');
+      if (wrapper && wrapper.dataset.panel) {
+        const panelData = JSON.parse(atob(wrapper.dataset.panel));
+        openPanel(panelData);
+      }
+      
+      // Handle inline text links
+      const inlineLink = e.target.closest('.inline-link');
+      if (inlineLink && inlineLink.dataset.panelKey) {
+        const key = inlineLink.dataset.panelKey;
+        const panels = getPanels();
+        if (panels[key]) {
+          openPanel(panels[key]);
+        }
+      }
+    });
+
+    // Get panels data (extracted for reuse)
+    function getPanels() {
+      return {
+        who: {
+          title: 'Who We Are',
+          content: `
+            <div class="section-title">› Origin</div>
+            <p>Blacksky started the way most good things do—with curiosity and a blinking cursor. Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. That obsession never faded. It just evolved.</p>
+            <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft. It should be built with intention, precision, and respect for the people who use it.</p>
+            
+            <div class="section-title">› The Name</div>
+            <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible. It's potential—quiet, vast, and ready.</p>
+            <p>We've been building in that space for nearly two decades. Still curious. Still coding. Still obsessed with getting it right.</p>
+          `
+        },
+        what: {
+          title: 'What We Do',
+          content: `
+            <div class="section-title">› Enterprise Platforms</div>
+            <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like Treasury, NIH, FDA, and DOT. Fortune 500 companies like Vanguard and Mastercard. Systems that serve millions of users and handle mission-critical data.</p>
+            
+            <div class="section-title">› Technical Scope</div>
+            <p>Our work spans the full stack: cloud infrastructure, distributed systems, API design, AI integration, and complex migrations.</p>
+            <p>We've led 15+ large-scale platform modernizations—SharePoint to Drupal, monoliths to microservices, legacy systems to cloud-native architectures.</p>
+            
+            <div class="section-title">› How We Think</div>
+            <p>Design matters. Not just visual design, but system design. The elegance of an API. The clarity of a data model. The efficiency of a deployment pipeline. We believe beautiful code leads to reliable systems.</p>
+            <p>We're skeptical of hype and allergic to buzzwords. When we adopt new technology—whether it's Kubernetes, AI, or the framework of the moment—it's because we've tested it, understood it, and determined it actually solves a problem.</p>
+          `
+        },
+        why: {
+          title: 'Why It Matters',
+          content: `
+            <div class="section-title">› Responsibility</div>
+            <p>The systems we build affect real people. A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. This isn't abstract—it's responsibility.</p>
+            
+            <div class="section-title">› Civic Technology</div>
+            <p>We also believe technology should serve democracy, not just commerce. Our civic technology work, including projects like Poly Sci Fi, reflects a commitment to using these same enterprise-grade capabilities to make government more transparent and participation more accessible.</p>
+            
+            <div class="section-title">› Our Values</div>
+            <p>Blacksky believes technology should empower people, not just corporations.</p>
+            <p>We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.</p>
+            <p>Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged.</p>
+          `
+        },
+        treasury: {
+          title: 'Treasury Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky architected and executed migration of 6 mission-critical SharePoint sites to a unified Drupal 8 platform for treasury.gov, consolidating fragmented content systems into a cohesive digital ecosystem.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed enterprise content architecture supporting treasury.gov and 5 subsidiary sites, used by 200+ content creators.</p>
+            <p>Built custom migration framework successfully migrating 15,000+ documents and pages with 98% content fidelity.</p>
+            <p>Reduced deployment time from 3 days to 4 hours through CI/CD pipeline improvements.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 8, PHP, XML processing, Acquia Cloud, custom ETL tools</p>
+          `
+        },
+        nih: {
+          title: 'NIH Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky architected a migration from Drupal 8 to Drupal 10 for the National Institute of Nursing Research, requiring federal security clearance and compliance with strict government security protocols.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed FISMA-compliant architecture meeting NIH security standards and federal data protection requirements.</p>
+            <p>Architected custom integration layer connecting NIH research databases with public-facing website.</p>
+            <p>Implemented Apache Solr search infrastructure enabling complex research publication queries.</p>
+            
+            <div class="section-title">› Security</div>
+            <p>NIH background check and facility badge required.</p>
+          `
+        },
+        fda: {
+          title: 'FDA Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky contributed to FDA platform enhancements supporting regulatory requirements through Phase2.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
+          `
+        },
+        vanguard: {
+          title: 'Vanguard Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky led technical transformation from monolithic Drupal 8 to headless architecture, decoupling content management from presentation layer for multi-channel content delivery.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed and implemented RESTful API layer serving content to Angular frontend.</p>
+            <p>Architected content export system reducing API response times by 40%.</p>
+            <p>Led Drupal 8 to 9 upgrade while simultaneously implementing headless architecture without service interruption.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, RESTful APIs, JSON, Angular, Acquia Cloud, AWS, PHPUnit</p>
+          `
+        },
+        mastercard: {
+          title: 'Mastercard Project',
+          content: `
+            <img src="/static/images/mastercard.png" alt="Mastercard" class="slideout-image" onerror="this.style.display='none'">
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky built a custom bulk upload system for Mastercard enabling efficient file processing and content management.</p>
+            
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Built custom Drupal 9 module enabling bulk upload of hundreds of files with automated validation.</p>
+            <p>Designed file processing pipeline including unzip functionality, naming convention verification, and automated node creation.</p>
+            
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
+          `
+        },
+        mission: {
+          title: 'Our Mission',
+          content: `
+            <div class="section-title">› What We Believe</div>
+            <p>Blacksky believes technology should empower people, not just corporations.</p>
+            <p>While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation.</p>
+            
+            <div class="section-title">› Civic Technology</div>
+            <p>Our flagship project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials.</p>
+            
+            <div class="section-title">› Our Values</div>
+            <p>We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.</p>
+            <p>Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged.</p>
+          `
+        }
+      };
+    }
+
+    // Left menu functionality
+    const menuToggle = document.getElementById('menuToggle');
+    const menuToggleTitle = document.getElementById('menuToggleTitle');
+    const menuOverlay = document.getElementById('menuOverlay');
+    const menuPanel = document.getElementById('menuPanel');
+    const menuClose = document.getElementById('menuClose');
+    const menuItems = document.querySelectorAll('.menu-item');
+
+    function openMenu() {
+      menuOverlay.classList.add('active');
+      menuPanel.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeMenu() {
+      menuOverlay.classList.remove('active');
+      menuPanel.classList.remove('active');
+      if (!slideoutPanel.classList.contains('active')) {
+        document.body.style.overflow = '';
+      }
+    }
+
+    menuToggle.addEventListener('click', openMenu);
+    menuToggleTitle.addEventListener('click', openMenu);
+    menuClose.addEventListener('click', closeMenu);
+    menuOverlay.addEventListener('click', closeMenu);
+
+    menuItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const key = item.dataset.panelKey;
+        const panels = getPanels();
+        if (panels[key]) {
+          closeMenu();
+          setTimeout(() => openPanel(panels[key]), 150);
+        }
+      });
+    });
+
+    // Close panel with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closePanel();
+    });
   </script>
 </body>
 </html>
