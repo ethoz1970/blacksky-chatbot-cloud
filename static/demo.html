@@ -82,6 +82,37 @@
       color: #888;
     }
 
+    .message.bot .message-text {
+      background: #141414;
+      padding: 16px 20px;
+      border-radius: 4px;
+      border-left: 2px solid #333;
+    }
+
+    .message.bot .message-text .list-item {
+      display: block;
+      padding: 8px 0;
+      border-bottom: 1px solid #222;
+    }
+
+    .message.bot .message-text .list-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .message.bot .message-text .list-item:first-child {
+      padding-top: 0;
+    }
+
+    .message-image {
+      display: block;
+      max-width: 120px;
+      height: auto;
+      margin-bottom: 16px;
+      opacity: 0.9;
+      border-radius: 4px;
+    }
+
     .typing-indicator {
       display: inline;
     }
@@ -189,8 +220,44 @@
 
   <div class="chat-container">
     <div class="messages" id="messages">
-      <div class="welcome" id="welcome">
-        <div class="welcome-text">Ready_</div>
+      <div class="message user">
+        <div class="message-label">You</div>
+        <div class="message-text">Tell me about Blacksky.</div>
+      </div>
+
+      <div class="message bot">
+        <div class="message-label">Blacksky</div>
+        <div class="message-text">
+          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;">› Origin</span></p>
+          
+          <p>Blacksky started the way most good things do—with curiosity and a blinking cursor. Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. That obsession never faded. It just evolved.</p>
+          
+          <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft. It should be built with intention, precision, and respect for the people who use it.</p>
+
+          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› What We Do</span></p>
+          
+          <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like Treasury, NIH, FDA, and DOT. Fortune 500 companies like Vanguard and Mastercard. Systems that serve millions of users and handle mission-critical data.</p>
+          
+          <p>Our work spans the full stack: cloud infrastructure, distributed systems, API design, AI integration, and complex migrations. We've led 15+ large-scale platform modernizations—SharePoint to Drupal, monoliths to microservices, legacy systems to cloud-native architectures.</p>
+
+          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› How We Think</span></p>
+          
+          <p>Design matters. Not just visual design, but system design. The elegance of an API. The clarity of a data model. The efficiency of a deployment pipeline. We believe beautiful code leads to reliable systems.</p>
+          
+          <p>We're skeptical of hype and allergic to buzzwords. When we adopt new technology—whether it's Kubernetes, AI, or the framework of the moment—it's because we've tested it, understood it, and determined it actually solves a problem. Technology for its own sake is waste.</p>
+
+          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› Why It Matters</span></p>
+          
+          <p>The systems we build affect real people. A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. This isn't abstract—it's responsibility.</p>
+          
+          <p>We also believe technology should serve democracy, not just commerce. Our civic technology work, including projects like Poly Sci Fi, reflects a commitment to using these same enterprise-grade capabilities to make government more transparent and participation more accessible.</p>
+
+          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› The Name</span></p>
+          
+          <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible. It's potential—quiet, vast, and ready.</p>
+          
+          <p>We've been building in that space for nearly two decades. Still curious. Still coding. Still obsessed with getting it right.</p>
+        </div>
       </div>
     </div>
 
@@ -209,26 +276,88 @@
   <script>
     const API_HOST = window.location.origin;
     const messages = document.getElementById('messages');
-    const welcome = document.getElementById('welcome');
     const input = document.getElementById('input');
     const sendBtn = document.getElementById('send');
     
     let isLoading = false;
-    let hasMessages = false;
+    let hasMessages = true;
+
+    function getImageForTopic(text) {
+      const lower = text.toLowerCase();
+      
+      // Federal agencies
+      if (lower.includes('treasury')) return { src: '/static/images/treasury.png', alt: 'Treasury Department' };
+      if (lower.includes('nih') || lower.includes('national institute')) return { src: '/static/images/nih.png', alt: 'NIH' };
+      if (lower.includes('fda')) return { src: '/static/images/fda.png', alt: 'FDA' };
+      if (lower.includes('usda') || lower.includes('fsis') || lower.includes('food safety')) return { src: '/static/images/usda.png', alt: 'USDA' };
+      if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/dot.png', alt: 'Department of Transportation' };
+      if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'SEC' };
+      if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'HHS' };
+      if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID' };
+      
+      // Companies
+      if (lower.includes('vanguard')) return { src: '/static/images/vanguard.png', alt: 'Vanguard' };
+      if (lower.includes('mastercard')) return { src: '/static/images/mastercard.png', alt: 'Mastercard' };
+      if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield' };
+      if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank' };
+      if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard' };
+      
+      // Technologies
+      if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal' };
+      if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes' };
+      if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Azure' };
+      if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'AWS' };
+      
+      return null;
+    }
 
     function formatMessage(text) {
-      let formatted = text.replace(/\n/g, '<br>');
-      formatted = formatted.replace(/^- (.+)$/gm, '› $1');
-      formatted = formatted.replace(/(<br>)- /g, '$1› ');
-      return formatted;
+      // Strip markdown bold **text** and __text__
+      text = text.replace(/\*\*(.+?)\*\*/g, '$1');
+      text = text.replace(/__(.+?)__/g, '$1');
+      
+      // Strip markdown italic *text* and _text_
+      text = text.replace(/\*(.+?)\*/g, '$1');
+      text = text.replace(/_(.+?)_/g, '$1');
+
+      // Split into lines
+      let lines = text.split('\n');
+      let formatted = [];
+      let inList = false;
+      let listItems = [];
+
+      for (let line of lines) {
+        // Check if line is a list item
+        if (line.trim().match(/^[-•›]\s+/) || line.trim().match(/^\d+\.\s+/)) {
+          // Clean the bullet/number
+          let content = line.trim().replace(/^[-•›]\s+/, '').replace(/^\d+\.\s+/, '');
+          listItems.push(content);
+          inList = true;
+        } else {
+          // If we were in a list, close it
+          if (inList && listItems.length > 0) {
+            let listHtml = listItems.map(item => `<span class="list-item">› ${item}</span>`).join('');
+            formatted.push(listHtml);
+            listItems = [];
+            inList = false;
+          }
+          // Add regular line
+          if (line.trim()) {
+            formatted.push(line);
+          }
+        }
+      }
+
+      // Handle any remaining list items
+      if (listItems.length > 0) {
+        let listHtml = listItems.map(item => `<span class="list-item">› ${item}</span>`).join('');
+        formatted.push(listHtml);
+      }
+
+      return formatted.join('<br><br>');
     }
 
     function addMessage(text, sender) {
-      if (!hasMessages) {
-        welcome.style.display = 'none';
-        hasMessages = true;
-      }
-
       const div = document.createElement('div');
       div.className = `message ${sender}`;
       
@@ -237,9 +366,18 @@
         ? formatMessage(text) 
         : text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
       
+      // Check for relevant image
+      let imageHtml = '';
+      if (sender === 'bot') {
+        const image = getImageForTopic(text);
+        if (image) {
+          imageHtml = `<img src="${image.src}" alt="${image.alt}" class="message-image" onerror="this.style.display='none'">`;
+        }
+      }
+      
       div.innerHTML = `
         <div class="message-label">${label}</div>
-        <div class="message-text">${content}</div>
+        <div class="message-text">${imageHtml}${content}</div>
       `;
       
       messages.appendChild(div);
@@ -247,11 +385,6 @@
     }
 
     function showTyping() {
-      if (!hasMessages) {
-        welcome.style.display = 'none';
-        hasMessages = true;
-      }
-
       const div = document.createElement('div');
       div.className = 'message bot';
       div.id = 'typing';

@@ -31,7 +31,7 @@ TOP_P = 0.9
 
 # Server settings
 HOST = "0.0.0.0"
-PORT = int(os.getenv("PORT", 8000))
+PORT = int(os.getenv("PORT", 8001))
 
 # Conversation settings
 MAX_HISTORY_TURNS = 4

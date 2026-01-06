@@ -9,4 +9,9 @@ __pycache__/
 .idea/
 
 # OS
+.DS_Storevenv/
+__pycache__/
 .DS_Store
+models/
+chroma_db/
+chroma_db/
