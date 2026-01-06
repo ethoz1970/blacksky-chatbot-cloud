@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blacksky</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'IBM Plex Mono', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 24px 32px;
+      border-bottom: 1px solid #222;
+    }
+
+    .header-title {
+      font-size: 0.875rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666;
+    }
+
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 48px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .message {
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .message-label {
+      font-size: 0.6875rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 8px;
+    }
+
+    .message-text {
+      font-size: 0.9375rem;
+      line-height: 1.7;
+      color: #e0e0e0;
+    }
+
+    .message.user .message-text {
+      color: #888;
+    }
+
+    .typing-indicator {
+      display: inline;
+    }
+
+    .typing-indicator::after {
+      content: '▊';
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .input-container {
+      padding: 32px 0 48px;
+      border-top: 1px solid #222;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.7;
+      color: #e0e0e0;
+      resize: none;
+      min-height: 24px;
+      max-height: 200px;
+    }
+
+    textarea::placeholder {
+      color: #333;
+    }
+
+    .send-button {
+      background: transparent;
+      border: 1px solid #333;
+      color: #666;
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .send-button:hover {
+      border-color: #e0e0e0;
+      color: #e0e0e0;
+    }
+
+    .send-button:disabled {
+      border-color: #222;
+      color: #333;
+      cursor: not-allowed;
+    }
+
+    .welcome {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .welcome-text {
+      font-size: 0.875rem;
+      color: #333;
+      letter-spacing: 0.05em;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: #222;
+    }
+
+    @media (max-width: 640px) {
+      .header, .chat-container {
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-title">Blacksky</div>
+  </div>
+
+  <div class="chat-container">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-text">Ready_</div>
+      </div>
+    </div>
+
+    <div class="input-container">
+      <div class="input-row">
+        <textarea 
+          id="input" 
+          rows="1" 
+          placeholder="> Enter query"
+        ></textarea>
+        <button class="send-button" id="send">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_HOST = window.location.origin;
+    const messages = document.getElementById('messages');
+    const welcome = document.getElementById('welcome');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    
+    let isLoading = false;
+    let hasMessages = false;
+
+    function formatMessage(text) {
+      let formatted = text.replace(/\n/g, '<br>');
+      formatted = formatted.replace(/^- (.+)$/gm, '› $1');
+      formatted = formatted.replace(/(<br>)- /g, '$1› ');
+      return formatted;
+    }
+
+    function addMessage(text, sender) {
+      if (!hasMessages) {
+        welcome.style.display = 'none';
+        hasMessages = true;
+      }
+
+      const div = document.createElement('div');
+      div.className = `message ${sender}`;
+      
+      const label = sender === 'bot' ? 'Blacksky' : 'You';
+      const content = sender === 'bot' 
+        ? formatMessage(text) 
+        : text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+      
+      div.innerHTML = `
+        <div class="message-label">${label}</div>
+        <div class="message-text">${content}</div>
+      `;
+      
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function showTyping() {
+      if (!hasMessages) {
+        welcome.style.display = 'none';
+        hasMessages = true;
+      }
+
+      const div = document.createElement('div');
+      div.className = 'message bot';
+      div.id = 'typing';
+      div.innerHTML = `
+        <div class="message-label">Blacksky</div>
+        <div class="message-text"><span class="typing-indicator"></span></div>
+      `;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function hideTyping() {
+      const typing = document.getElementById('typing');
+      if (typing) typing.remove();
+    }
+
+    function autoResize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+    }
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text || isLoading) return;
+
+      addMessage(text, 'user');
+      input.value = '';
+      autoResize();
+      
+      isLoading = true;
+      sendBtn.disabled = true;
+      showTyping();
+
+      try {
+        const res = await fetch(`${API_HOST}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        
+        const data = await res.json();
+        hideTyping();
+        addMessage(data.response, 'bot');
+      } catch (err) {
+        hideTyping();
+        addMessage('Connection error. Retry.', 'bot');
+      } finally {
+        isLoading = false;
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('input', autoResize);
+    
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    input.focus();
+  </script>
+</body>
+</html>

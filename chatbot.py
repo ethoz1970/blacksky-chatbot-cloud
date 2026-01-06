@@ -1,0 +1,143 @@
+"""
+Core chatbot logic using Together AI
+"""
+from together import Together
+
+from config import (
+    TOGETHER_API_KEY,
+    TOGETHER_MODEL,
+    MAX_TOKENS,
+    TEMPERATURE,
+    TOP_P,
+    MAX_HISTORY_TURNS
+)
+from prompts import SYSTEM_PROMPT
+from rag import DocumentStore
+
+
+class BlackskyChatbot:
+    """Chatbot wrapper using Together AI for inference."""
+    
+    def __init__(self, use_rag: bool = True):
+        self.client = None
+        self.conversation_history = []
+        self.use_rag = use_rag
+        self.doc_store = None
+        
+    def initialize(self):
+        """Initialize Together AI client and RAG."""
+        print("Initializing Blacksky Chatbot (Cloud)...")
+        
+        # Initialize Together AI client
+        self.client = Together(api_key=TOGETHER_API_KEY)
+        print("✓ Together AI client ready")
+        
+        # Initialize RAG if enabled
+        if self.use_rag:
+            self.doc_store = DocumentStore()
+            self.doc_store.initialize()
+        
+        print()
+        
+    def chat(self, user_message: str) -> str:
+        """Generate a response to the user's message."""
+        if self.client is None:
+            raise RuntimeError("Client not initialized. Call initialize() first.")
+        
+        # Get RAG context if enabled
+        rag_context = ""
+        if self.use_rag and self.doc_store:
+            try:
+                rag_context = self.doc_store.get_context(user_message)
+            except Exception as e:
+                print(f"RAG error: {e}")
+        
+        # Build system prompt with optional RAG context
+        system_content = SYSTEM_PROMPT
+        if rag_context:
+            system_content = f"{SYSTEM_PROMPT}\n\n{rag_context}"
+        
+        # Build messages array
+        messages = [{"role": "system", "content": system_content}]
+        
+        # Add conversation history
+        for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
+            messages.append({"role": "user", "content": turn["user"]})
+            messages.append({"role": "assistant", "content": turn["assistant"]})
+        
+        # Add current user message
+        messages.append({"role": "user", "content": user_message})
+        
+        # Call Together AI
+        response = self.client.chat.completions.create(
+            model=TOGETHER_MODEL,
+            messages=messages,
+            max_tokens=MAX_TOKENS,
+            temperature=TEMPERATURE,
+            top_p=TOP_P,
+        )
+        
+        assistant_message = response.choices[0].message.content.strip()
+        
+        # Store in history
+        self.conversation_history.append({
+            "user": user_message,
+            "assistant": assistant_message
+        })
+        
+        return assistant_message
+    
+    def clear_history(self):
+        """Clear conversation history."""
+        self.conversation_history = []
+        return "Conversation cleared. Fresh start!"
+    
+    def get_stats(self) -> dict:
+        """Return current stats."""
+        stats = {
+            "history_turns": len(self.conversation_history),
+            "max_history": MAX_HISTORY_TURNS,
+            "model": TOGETHER_MODEL,
+            "rag_enabled": self.use_rag
+        }
+        if self.use_rag and self.doc_store:
+            try:
+                rag_stats = self.doc_store.get_stats()
+                stats["indexed_vectors"] = rag_stats["total_vectors"]
+            except Exception:
+                stats["indexed_vectors"] = 0
+        return stats
+
+
+# CLI interface for testing
+if __name__ == "__main__":
+    print("=" * 50)
+    print("Blacksky Chatbot (Cloud) - CLI Mode")
+    print("=" * 50)
+    print("Commands: /clear (reset history), /stats, /quit\n")
+    
+    bot = BlackskyChatbot(use_rag=True)
+    bot.initialize()
+    
+    while True:
+        try:
+            user_input = input("You: ").strip()
+            
+            if not user_input:
+                continue
+            elif user_input.lower() == "/quit":
+                print("Goodbye!")
+                break
+            elif user_input.lower() == "/clear":
+                print(f"Bot: {bot.clear_history()}")
+                continue
+            elif user_input.lower() == "/stats":
+                print(f"Stats: {bot.get_stats()}")
+                continue
+            
+            response = bot.chat(user_input)
+            print(f"Bot: {response}\n")
+            
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
