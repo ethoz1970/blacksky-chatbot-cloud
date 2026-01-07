@@ -549,6 +549,7 @@
     </div>
   </div>
 
+  <script src="/static/panels.js"></script>
   <script>
     const API_HOST = window.location.origin;
     const messages = document.getElementById('messages');
@@ -766,7 +767,8 @@
       if (sender === 'bot') {
         const image = getImageForTopic(text);
         if (image) {
-          const clickable = image.panel ? 'data-panel="' + btoa(JSON.stringify(image.panel)) + '"' : '';
+          // Use encodeURIComponent for unicode-safe encoding
+          const clickable = image.panel ? 'data-panel="' + encodeURIComponent(JSON.stringify(image.panel)) + '"' : '';
           const clickClass = image.panel ? 'clickable' : '';
           imageHtml = `
             <div class="message-image-wrapper ${clickClass}" ${clickable}>
@@ -824,18 +826,27 @@
       showTyping();
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+        
+        console.log('Sending request...');
         const res = await fetch(`${API_HOST}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
+          body: JSON.stringify({ message: text }),
+          signal: controller.signal
         });
         
+        console.log('Response status:', res.status);
+        clearTimeout(timeoutId);
         const data = await res.json();
+        console.log('Response data:', data);
         hideTyping();
         addMessage(data.response, 'bot');
       } catch (err) {
+        console.error('Fetch error:', err);
         hideTyping();
-        addMessage('Connection error. Retry.', 'bot');
+        addMessage("Sorry, there are a lot of people talking in my ear at once. Try again in a moment?", 'bot');
       } finally {
         isLoading = false;
         sendBtn.disabled = false;
@@ -883,7 +894,7 @@
     document.addEventListener('click', (e) => {
       const wrapper = e.target.closest('.message-image-wrapper.clickable');
       if (wrapper && wrapper.dataset.panel) {
-        const panelData = JSON.parse(atob(wrapper.dataset.panel));
+        const panelData = JSON.parse(decodeURIComponent(wrapper.dataset.panel));
         openPanel(panelData);
       }
       
@@ -898,173 +909,7 @@
       }
     });
 
-    // Get panels data (extracted for reuse)
-    function getPanels() {
-      return {
-        who: {
-          title: 'Who We Are',
-          content: `
-            <img src="/static/images/blacksky-logo.png" alt="Blacksky" class="slideout-image" onerror="this.style.display='none'">
-            
-            <div class="section-title">› Origin Story</div>
-            <p>Blacksky started the way most good things do—with curiosity and a blinking cursor.</p>
-            <p>Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. When the lab wasn't available, a $35 Radio Shack computer filled the gap. Then came the Commodore VIC-20. Then the C64. Each machine a new universe to explore.</p>
-            <p>That obsession never faded. It just evolved.</p>
-            
-            <div class="section-title">› The Company</div>
-            <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft. It should be built with intention, precision, and respect for the people who use it.</p>
-            <p>Today, Blacksky serves federal agencies and Fortune 500 companies—organizations where failure isn't an option. Treasury. NIH. FDA. Vanguard. Mastercard. Systems that serve millions and handle mission-critical data.</p>
-            
-            <div class="section-title">› The Name</div>
-            <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible.</p>
-            <p>It's potential—quiet, vast, and ready.</p>
-            <p>We've been building in that space for nearly two decades. Still curious. Still coding. Still obsessed with getting it right.</p>
-            
-            <div class="section-title">› The Person</div>
-            <p>Mario Moorhead is the founder and principal architect of Blacksky LLC. With 18+ years of enterprise development experience, active federal security clearances, and a background spanning UX design to distributed systems architecture, he brings a rare combination of technical depth and design sensibility to every project.</p>
-          `
-        },
-        what: {
-          title: 'What We Do',
-          content: `
-            <div class="section-title">› Enterprise Platforms</div>
-            <p>We architect enterprise platforms for organizations where failure isn't an option.</p>
-            <p>Federal agencies like Treasury, NIH, FDA, DOT, OSHA, SEC, FSIS, and HHS. Fortune 500 companies like Vanguard, Mastercard, and Blue Cross Blue Shield. Systems that serve 50M+ users and handle mission-critical data.</p>
-            
-            <div class="section-title">› Technical Scope</div>
-            <p>Our work spans the full stack:</p>
-            <p>› Cloud infrastructure (Azure, AWS, GCP)<br>
-            › Distributed systems and microservices<br>
-            › API design and integration<br>
-            › AI/ML solutions and implementation<br>
-            › Complex data migrations<br>
-            › Search architecture (Solr, Elasticsearch)<br>
-            › Container orchestration (Kubernetes)</p>
-            
-            <div class="section-title">› Platform Modernization</div>
-            <p>We've led 15+ large-scale platform modernizations:</p>
-            <p>› SharePoint to Drupal<br>
-            › Adobe CMS to Drupal<br>
-            › Monoliths to microservices<br>
-            › Legacy PHP to enterprise CMS<br>
-            › On-premise to cloud-native</p>
-            
-            <div class="section-title">› How We Think</div>
-            <p>Design matters. Not just visual design, but system design. The elegance of an API. The clarity of a data model. The efficiency of a deployment pipeline.</p>
-            <p>We believe beautiful code leads to reliable systems.</p>
-            <p>We're skeptical of hype and allergic to buzzwords. When we adopt new technology—whether it's Kubernetes, AI, or the framework of the moment—it's because we've tested it, understood it, and determined it actually solves a problem. Technology for its own sake is waste.</p>
-          `
-        },
-        why: {
-          title: 'Why It Matters',
-          content: `
-            <div class="section-title">› Responsibility</div>
-            <p>The systems we build affect real people.</p>
-            <p>A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. A DOT dashboard tracks $100M+ in infrastructure projects.</p>
-            <p>This isn't abstract—it's responsibility.</p>
-            
-            <div class="section-title">› Civic Technology</div>
-            <p>We believe technology should serve democracy, not just commerce.</p>
-            <p>Our flagship civic project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials.</p>
-            <p>Real-time congressional data. Voting records. Committee assignments. All 535 members of Congress, accessible and searchable.</p>
-            
-            <div class="section-title">› Our Values</div>
-            <p>Blacksky believes technology should empower people, not just corporations.</p>
-            <p>We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.</p>
-            <p>Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged.</p>
-            
-            <div class="section-title">› The Mission</div>
-            <p>While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation.</p>
-            <p>Blacksky values civic technology initiatives and prioritizes projects that create positive social impact alongside business value.</p>
-          `
-        },
-        treasury: {
-          title: 'Treasury Project',
-          content: `
-            <div class="section-title">› Project Overview</div>
-            <p>Blacksky architected and executed migration of 6 mission-critical SharePoint sites to a unified Drupal 8 platform for treasury.gov, consolidating fragmented content systems into a cohesive digital ecosystem.</p>
-            
-            <div class="section-title">› Key Accomplishments</div>
-            <p>Designed enterprise content architecture supporting treasury.gov and 5 subsidiary sites, used by 200+ content creators.</p>
-            <p>Built custom migration framework successfully migrating 15,000+ documents and pages with 98% content fidelity.</p>
-            <p>Reduced deployment time from 3 days to 4 hours through CI/CD pipeline improvements.</p>
-            
-            <div class="section-title">› Technologies</div>
-            <p>Drupal 8, PHP, XML processing, Acquia Cloud, custom ETL tools</p>
-          `
-        },
-        nih: {
-          title: 'NIH Project',
-          content: `
-            <div class="section-title">› Project Overview</div>
-            <p>Blacksky architected a migration from Drupal 8 to Drupal 10 for the National Institute of Nursing Research, requiring federal security clearance and compliance with strict government security protocols.</p>
-            
-            <div class="section-title">› Key Accomplishments</div>
-            <p>Designed FISMA-compliant architecture meeting NIH security standards and federal data protection requirements.</p>
-            <p>Architected custom integration layer connecting NIH research databases with public-facing website.</p>
-            <p>Implemented Apache Solr search infrastructure enabling complex research publication queries.</p>
-            
-            <div class="section-title">› Security</div>
-            <p>NIH background check and facility badge required.</p>
-          `
-        },
-        fda: {
-          title: 'FDA Project',
-          content: `
-            <div class="section-title">› Project Overview</div>
-            <p>Blacksky contributed to FDA platform enhancements supporting regulatory requirements through Phase2.</p>
-            
-            <div class="section-title">› Technologies</div>
-            <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
-          `
-        },
-        vanguard: {
-          title: 'Vanguard Project',
-          content: `
-            <div class="section-title">› Project Overview</div>
-            <p>Blacksky led technical transformation from monolithic Drupal 8 to headless architecture, decoupling content management from presentation layer for multi-channel content delivery.</p>
-            
-            <div class="section-title">› Key Accomplishments</div>
-            <p>Designed and implemented RESTful API layer serving content to Angular frontend.</p>
-            <p>Architected content export system reducing API response times by 40%.</p>
-            <p>Led Drupal 8 to 9 upgrade while simultaneously implementing headless architecture without service interruption.</p>
-            
-            <div class="section-title">› Technologies</div>
-            <p>Drupal 9, PHP, RESTful APIs, JSON, Angular, Acquia Cloud, AWS, PHPUnit</p>
-          `
-        },
-        mastercard: {
-          title: 'Mastercard Project',
-          content: `
-            <img src="/static/images/mastercard.png" alt="Mastercard" class="slideout-image" onerror="this.style.display='none'">
-            <div class="section-title">› Project Overview</div>
-            <p>Blacksky built a custom bulk upload system for Mastercard enabling efficient file processing and content management.</p>
-            
-            <div class="section-title">› Key Accomplishments</div>
-            <p>Built custom Drupal 9 module enabling bulk upload of hundreds of files with automated validation.</p>
-            <p>Designed file processing pipeline including unzip functionality, naming convention verification, and automated node creation.</p>
-            
-            <div class="section-title">› Technologies</div>
-            <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
-          `
-        },
-        mission: {
-          title: 'Our Mission',
-          content: `
-            <div class="section-title">› What We Believe</div>
-            <p>Blacksky believes technology should empower people, not just corporations.</p>
-            <p>While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation.</p>
-            
-            <div class="section-title">› Civic Technology</div>
-            <p>Our flagship project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials.</p>
-            
-            <div class="section-title">› Our Values</div>
-            <p>We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.</p>
-            <p>Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged.</p>
-          `
-        }
-      };
-    }
+    // Panels now loaded from /static/panels.js and /static/panels.json
 
     // Left menu functionality
     const menuToggleTitle = document.getElementById('menuToggleTitle');

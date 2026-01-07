@@ -1,0 +1,282 @@
+{
+  "who": {
+    "title": "Who We Are",
+    "image": "/static/images/blacksky-logo.png",
+    "content": [
+      {
+        "section": "Origin Story",
+        "text": [
+          "Blacksky started the way most good things do—with curiosity and a blinking cursor.",
+          "Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. When the lab wasn't available, a $35 Radio Shack computer filled the gap. Then came the Commodore VIC-20. Then the C64. Each machine a new universe to explore.",
+          "That obsession never faded. It just evolved."
+        ]
+      },
+      {
+        "section": "The Company",
+        "text": [
+          "Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft. It should be built with intention, precision, and respect for the people who use it.",
+          "Today, Blacksky serves federal agencies and Fortune 500 companies—organizations where failure isn't an option. Treasury. NIH. FDA. Vanguard. Mastercard. Systems that serve millions and handle mission-critical data."
+        ]
+      },
+      {
+        "section": "The Name",
+        "text": [
+          "Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible.",
+          "It's potential—quiet, vast, and ready.",
+          "We've been building in that space for nearly two decades. Still curious. Still coding. Still obsessed with getting it right."
+        ]
+      },
+      {
+        "section": "The Person",
+        "text": [
+          "Mario Moorhead is the founder and principal architect of Blacksky LLC. With 18+ years of enterprise development experience, active federal security clearances, and a background spanning UX design to distributed systems architecture, he brings a rare combination of technical depth and design sensibility to every project."
+        ]
+      }
+    ]
+  },
+  "what": {
+    "title": "What We Do",
+    "image": null,
+    "content": [
+      {
+        "section": "Enterprise Platforms",
+        "text": [
+          "We architect enterprise platforms for organizations where failure isn't an option.",
+          "Federal agencies like Treasury, NIH, FDA, DOT, OSHA, SEC, FSIS, and HHS. Fortune 500 companies like Vanguard, Mastercard, and Blue Cross Blue Shield. Systems that serve 50M+ users and handle mission-critical data."
+        ]
+      },
+      {
+        "section": "Technical Scope",
+        "text": [
+          "Our work spans the full stack:",
+          "› Cloud infrastructure (Azure, AWS, GCP)\n› Distributed systems and microservices\n› API design and integration\n› AI/ML solutions and implementation\n› Complex data migrations\n› Search architecture (Solr, Elasticsearch)\n› Container orchestration (Kubernetes)"
+        ]
+      },
+      {
+        "section": "Platform Modernization",
+        "text": [
+          "We've led 15+ large-scale platform modernizations:",
+          "› SharePoint to Drupal\n› Adobe CMS to Drupal\n› Monoliths to microservices\n› Legacy PHP to enterprise CMS\n› On-premise to cloud-native"
+        ]
+      },
+      {
+        "section": "How We Think",
+        "text": [
+          "Design matters. Not just visual design, but system design. The elegance of an API. The clarity of a data model. The efficiency of a deployment pipeline.",
+          "We believe beautiful code leads to reliable systems.",
+          "We're skeptical of hype and allergic to buzzwords. When we adopt new technology—whether it's Kubernetes, AI, or the framework of the moment—it's because we've tested it, understood it, and determined it actually solves a problem. Technology for its own sake is waste."
+        ]
+      }
+    ]
+  },
+  "why": {
+    "title": "Why It Matters",
+    "image": null,
+    "content": [
+      {
+        "section": "Responsibility",
+        "text": [
+          "The systems we build affect real people.",
+          "A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. A DOT dashboard tracks $100M+ in infrastructure projects.",
+          "This isn't abstract—it's responsibility."
+        ]
+      },
+      {
+        "section": "Civic Technology",
+        "text": [
+          "We believe technology should serve democracy, not just commerce.",
+          "Our flagship civic project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials.",
+          "Real-time congressional data. Voting records. Committee assignments. All 535 members of Congress, accessible and searchable."
+        ]
+      },
+      {
+        "section": "Our Values",
+        "text": [
+          "Blacksky believes technology should empower people, not just corporations.",
+          "We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.",
+          "Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged."
+        ]
+      },
+      {
+        "section": "The Mission",
+        "text": [
+          "While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation.",
+          "Blacksky values civic technology initiatives and prioritizes projects that create positive social impact alongside business value."
+        ]
+      }
+    ]
+  },
+  "treasury": {
+    "title": "Treasury Project",
+    "image": "/static/images/treasury.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky architected and executed migration of 6 mission-critical SharePoint sites to a unified Drupal 8 platform for treasury.gov, consolidating fragmented content systems into a cohesive digital ecosystem."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Designed enterprise content architecture supporting treasury.gov and 5 subsidiary sites, used by 200+ content creators.",
+          "Built custom migration framework successfully migrating 15,000+ documents and pages with 98% content fidelity.",
+          "Reduced deployment time from 3 days to 4 hours through CI/CD pipeline improvements."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 8, PHP, XML processing, Acquia Cloud, custom ETL tools"
+        ]
+      }
+    ]
+  },
+  "nih": {
+    "title": "NIH Project",
+    "image": "/static/images/nih.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky architected a migration from Drupal 8 to Drupal 10 for the National Institute of Nursing Research, requiring federal security clearance and compliance with strict government security protocols."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Designed FISMA-compliant architecture meeting NIH security standards and federal data protection requirements.",
+          "Architected custom integration layer connecting NIH research databases with public-facing website.",
+          "Implemented Apache Solr search infrastructure enabling complex research publication queries."
+        ]
+      },
+      {
+        "section": "Security",
+        "text": [
+          "NIH background check and facility badge required."
+        ]
+      }
+    ]
+  },
+  "fda": {
+    "title": "FDA Project",
+    "image": "/static/images/fda.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky contributed to FDA platform enhancements supporting regulatory requirements through Phase2."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 9, PHP, Acquia Cloud, Docker"
+        ]
+      }
+    ]
+  },
+  "usda": {
+    "title": "USDA FSIS Project",
+    "image": "/static/images/usda.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky led the architectural design and implementation of an enterprise-scale Drupal 10 platform modernization for the USDA Food Safety and Inspection Service, focusing on high-availability infrastructure and AI-powered content services."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Designed and implemented Redis Cluster architecture on Azure Kubernetes Service, improving application response times by 70%.",
+          "Architected AI-powered translation service enabling real-time multilingual content delivery across 15+ languages.",
+          "Established Kubernetes deployment pipeline with automated scaling, reducing infrastructure costs by 40%."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 10, PHP, Kubernetes, Redis Cluster, Azure Cloud, Apache Solr, AI integration"
+        ]
+      }
+    ]
+  },
+  "vanguard": {
+    "title": "Vanguard Project",
+    "image": "/static/images/vanguard.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky led technical transformation from monolithic Drupal 8 to headless architecture, decoupling content management from presentation layer for multi-channel content delivery."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Designed and implemented RESTful API layer serving content to Angular frontend.",
+          "Architected content export system reducing API response times by 40%.",
+          "Led Drupal 8 to 9 upgrade while simultaneously implementing headless architecture without service interruption."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 9, PHP, RESTful APIs, JSON, Angular, Acquia Cloud, AWS, PHPUnit"
+        ]
+      }
+    ]
+  },
+  "mastercard": {
+    "title": "Mastercard Project",
+    "image": "/static/images/mastercard.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky built a custom bulk upload system for Mastercard enabling efficient file processing and content management."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Built custom Drupal 9 module enabling bulk upload of hundreds of files with automated validation.",
+          "Designed file processing pipeline including unzip functionality, naming convention verification, and automated node creation."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 9, PHP, Acquia Cloud, Docker"
+        ]
+      }
+    ]
+  },
+  "mission": {
+    "title": "Our Mission",
+    "image": null,
+    "content": [
+      {
+        "section": "What We Believe",
+        "text": [
+          "Blacksky believes technology should empower people, not just corporations.",
+          "While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation."
+        ]
+      },
+      {
+        "section": "Civic Technology",
+        "text": [
+          "Our flagship project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials."
+        ]
+      },
+      {
+        "section": "Our Values",
+        "text": [
+          "We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.",
+          "Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged."
+        ]
+      }
+    ]
+  }
+}

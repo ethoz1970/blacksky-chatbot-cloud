@@ -11,7 +11,7 @@ load_dotenv()
 
 # Together AI settings
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
-TOGETHER_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"  # Or use "meta-llama/Llama-3-70b-chat-hf" for better quality
+TOGETHER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
 
 # Pinecone settings
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -25,13 +25,13 @@ CHUNK_OVERLAP = 50
 TOP_K = 5
 
 # Generation settings
-MAX_TOKENS = 300
+MAX_TOKENS = 350
 TEMPERATURE = 0.3
 TOP_P = 0.9
 
 # Server settings
 HOST = "0.0.0.0"
-PORT = int(os.getenv("PORT", 8001))
+PORT = int(os.getenv("PORT", 8000))
 
 # Conversation settings
 MAX_HISTORY_TURNS = 4
