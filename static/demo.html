@@ -29,30 +29,7 @@
       background: #0a0a0a;
       padding: 24px 32px;
       border-bottom: 1px solid #222;
-      display: flex;
-      align-items: center;
-      gap: 16px;
       z-index: 100;
-    }
-
-    .hamburger {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      cursor: pointer;
-      padding: 4px;
-    }
-
-    .hamburger span {
-      display: block;
-      width: 18px;
-      height: 2px;
-      background: #666;
-      transition: background 0.15s;
-    }
-
-    .hamburger:hover span {
-      background: #e0e0e0;
     }
 
     .header-title {
@@ -153,7 +130,7 @@
       font-size: 1.5rem;
       font-weight: 500;
       letter-spacing: 0.05em;
-      color: #444;
+      color: #888;
       cursor: pointer;
       padding: 16px 0;
       border-bottom: 1px solid #1a1a1a;
@@ -522,11 +499,6 @@
 </head>
 <body>
   <div class="header">
-    <div class="hamburger" id="menuToggle">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
     <div class="header-title" id="menuToggleTitle">Blacksky</div>
   </div>
 
@@ -534,7 +506,7 @@
   <div class="menu-overlay" id="menuOverlay"></div>
   <div class="menu-panel" id="menuPanel">
     <div class="menu-header">
-      <span class="menu-title">Menu</span>
+      <span class="menu-title">Blacksky is ...</span>
       <button class="menu-close" id="menuClose">×</button>
     </div>
     <div class="menu-items">
@@ -547,43 +519,9 @@
 
   <div class="chat-container">
     <div class="messages" id="messages">
-      <div class="message user">
-        <div class="message-label">You</div>
-        <div class="message-text">Tell me about Blacksky.</div>
-      </div>
-
-      <div class="message bot">
-        <div class="message-label">Blacksky</div>
-        <div class="message-text">
-          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;">› Origin</span></p>
-          
-          <p>Blacksky started the way most good things do—with curiosity and a blinking cursor. Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. That obsession never faded. It just evolved.</p>
-          
-          <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft. It should be built with intention, precision, and respect for the people who use it.</p>
-
-          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› What We Do</span></p>
-          
-          <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like <span class="inline-link" data-panel-key="treasury">Treasury</span>, <span class="inline-link" data-panel-key="nih">NIH</span>, <span class="inline-link" data-panel-key="fda">FDA</span>, and DOT. Fortune 500 companies like <span class="inline-link" data-panel-key="vanguard">Vanguard</span> and <span class="inline-link" data-panel-key="mastercard">Mastercard</span>. Systems that serve millions of users and handle mission-critical data.</p>
-          
-          <p>Our work spans the full stack: cloud infrastructure, distributed systems, API design, AI integration, and complex migrations. We've led 15+ large-scale platform modernizations—SharePoint to Drupal, monoliths to microservices, legacy systems to cloud-native architectures.</p>
-
-          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› How We Think</span></p>
-          
-          <p>Design matters. Not just visual design, but system design. The elegance of an API. The clarity of a data model. The efficiency of a deployment pipeline. We believe beautiful code leads to reliable systems.</p>
-          
-          <p>We're skeptical of hype and allergic to buzzwords. When we adopt new technology—whether it's Kubernetes, AI, or the framework of the moment—it's because we've tested it, understood it, and determined it actually solves a problem. Technology for its own sake is waste.</p>
-
-          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› Why It Matters</span></p>
-          
-          <p>The systems we build affect real people. A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. This isn't abstract—it's responsibility.</p>
-          
-          <p>We also believe technology should serve democracy, not just commerce. Our civic technology work, including projects like Poly Sci Fi, reflects a commitment to using these same enterprise-grade capabilities to make government more transparent and participation more accessible. <span class="inline-link" data-panel-key="mission">Read our mission ›</span></p>
-
-          <p><span style="color:#888;border-bottom:1px solid #333;padding-bottom:8px;display:block;margin-bottom:16px;margin-top:24px;">› The Name</span></p>
-          
-          <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible. It's potential—quiet, vast, and ready.</p>
-          
-          <p>We've been building in that space for nearly two decades. Still curious. Still coding. Still obsessed with getting it right.</p>
+      <div class="message bot" style="flex:1;display:flex;align-items:center;justify-content:center;">
+        <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
+          <p style="font-size:1.5rem;color:#666;margin:0;">... hello world ...</p>
         </div>
       </div>
     </div>
@@ -966,43 +904,78 @@
         who: {
           title: 'Who We Are',
           content: `
-            <div class="section-title">› Origin</div>
-            <p>Blacksky started the way most good things do—with curiosity and a blinking cursor. Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. That obsession never faded. It just evolved.</p>
+            <img src="/static/images/blacksky-logo.png" alt="Blacksky" class="slideout-image" onerror="this.style.display='none'">
+            
+            <div class="section-title">› Origin Story</div>
+            <p>Blacksky started the way most good things do—with curiosity and a blinking cursor.</p>
+            <p>Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. When the lab wasn't available, a $35 Radio Shack computer filled the gap. Then came the Commodore VIC-20. Then the C64. Each machine a new universe to explore.</p>
+            <p>That obsession never faded. It just evolved.</p>
+            
+            <div class="section-title">› The Company</div>
             <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft. It should be built with intention, precision, and respect for the people who use it.</p>
+            <p>Today, Blacksky serves federal agencies and Fortune 500 companies—organizations where failure isn't an option. Treasury. NIH. FDA. Vanguard. Mastercard. Systems that serve millions and handle mission-critical data.</p>
             
             <div class="section-title">› The Name</div>
-            <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible. It's potential—quiet, vast, and ready.</p>
+            <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible.</p>
+            <p>It's potential—quiet, vast, and ready.</p>
             <p>We've been building in that space for nearly two decades. Still curious. Still coding. Still obsessed with getting it right.</p>
+            
+            <div class="section-title">› The Person</div>
+            <p>Mario Moorhead is the founder and principal architect of Blacksky LLC. With 18+ years of enterprise development experience, active federal security clearances, and a background spanning UX design to distributed systems architecture, he brings a rare combination of technical depth and design sensibility to every project.</p>
           `
         },
         what: {
           title: 'What We Do',
           content: `
             <div class="section-title">› Enterprise Platforms</div>
-            <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like Treasury, NIH, FDA, and DOT. Fortune 500 companies like Vanguard and Mastercard. Systems that serve millions of users and handle mission-critical data.</p>
+            <p>We architect enterprise platforms for organizations where failure isn't an option.</p>
+            <p>Federal agencies like Treasury, NIH, FDA, DOT, OSHA, SEC, FSIS, and HHS. Fortune 500 companies like Vanguard, Mastercard, and Blue Cross Blue Shield. Systems that serve 50M+ users and handle mission-critical data.</p>
             
             <div class="section-title">› Technical Scope</div>
-            <p>Our work spans the full stack: cloud infrastructure, distributed systems, API design, AI integration, and complex migrations.</p>
-            <p>We've led 15+ large-scale platform modernizations—SharePoint to Drupal, monoliths to microservices, legacy systems to cloud-native architectures.</p>
+            <p>Our work spans the full stack:</p>
+            <p>› Cloud infrastructure (Azure, AWS, GCP)<br>
+            › Distributed systems and microservices<br>
+            › API design and integration<br>
+            › AI/ML solutions and implementation<br>
+            › Complex data migrations<br>
+            › Search architecture (Solr, Elasticsearch)<br>
+            › Container orchestration (Kubernetes)</p>
+            
+            <div class="section-title">› Platform Modernization</div>
+            <p>We've led 15+ large-scale platform modernizations:</p>
+            <p>› SharePoint to Drupal<br>
+            › Adobe CMS to Drupal<br>
+            › Monoliths to microservices<br>
+            › Legacy PHP to enterprise CMS<br>
+            › On-premise to cloud-native</p>
             
             <div class="section-title">› How We Think</div>
-            <p>Design matters. Not just visual design, but system design. The elegance of an API. The clarity of a data model. The efficiency of a deployment pipeline. We believe beautiful code leads to reliable systems.</p>
-            <p>We're skeptical of hype and allergic to buzzwords. When we adopt new technology—whether it's Kubernetes, AI, or the framework of the moment—it's because we've tested it, understood it, and determined it actually solves a problem.</p>
+            <p>Design matters. Not just visual design, but system design. The elegance of an API. The clarity of a data model. The efficiency of a deployment pipeline.</p>
+            <p>We believe beautiful code leads to reliable systems.</p>
+            <p>We're skeptical of hype and allergic to buzzwords. When we adopt new technology—whether it's Kubernetes, AI, or the framework of the moment—it's because we've tested it, understood it, and determined it actually solves a problem. Technology for its own sake is waste.</p>
           `
         },
         why: {
           title: 'Why It Matters',
           content: `
             <div class="section-title">› Responsibility</div>
-            <p>The systems we build affect real people. A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. This isn't abstract—it's responsibility.</p>
+            <p>The systems we build affect real people.</p>
+            <p>A platform at Treasury touches the financial infrastructure of the nation. An FDA system affects drug safety. An NIH portal supports medical research. A DOT dashboard tracks $100M+ in infrastructure projects.</p>
+            <p>This isn't abstract—it's responsibility.</p>
             
             <div class="section-title">› Civic Technology</div>
-            <p>We also believe technology should serve democracy, not just commerce. Our civic technology work, including projects like Poly Sci Fi, reflects a commitment to using these same enterprise-grade capabilities to make government more transparent and participation more accessible.</p>
+            <p>We believe technology should serve democracy, not just commerce.</p>
+            <p>Our flagship civic project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials.</p>
+            <p>Real-time congressional data. Voting records. Committee assignments. All 535 members of Congress, accessible and searchable.</p>
             
             <div class="section-title">› Our Values</div>
             <p>Blacksky believes technology should empower people, not just corporations.</p>
             <p>We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.</p>
             <p>Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged.</p>
+            
+            <div class="section-title">› The Mission</div>
+            <p>While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation.</p>
+            <p>Blacksky values civic technology initiatives and prioritizes projects that create positive social impact alongside business value.</p>
           `
         },
         treasury: {
@@ -1094,7 +1067,6 @@
     }
 
     // Left menu functionality
-    const menuToggle = document.getElementById('menuToggle');
     const menuToggleTitle = document.getElementById('menuToggleTitle');
     const menuOverlay = document.getElementById('menuOverlay');
     const menuPanel = document.getElementById('menuPanel');
@@ -1115,7 +1087,6 @@
       }
     }
 
-    menuToggle.addEventListener('click', openMenu);
     menuToggleTitle.addEventListener('click', openMenu);
     menuClose.addEventListener('click', closeMenu);
     menuOverlay.addEventListener('click', closeMenu);
