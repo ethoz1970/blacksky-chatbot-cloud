@@ -826,25 +826,84 @@
       showTyping();
 
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-        
-        console.log('Sending request...');
-        const res = await fetch(`${API_HOST}/chat`, {
+        const res = await fetch(`${API_HOST}/chat/stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text }),
-          signal: controller.signal
+          body: JSON.stringify({ message: text })
         });
         
-        console.log('Response status:', res.status);
-        clearTimeout(timeoutId);
-        const data = await res.json();
-        console.log('Response data:', data);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        
         hideTyping();
-        addMessage(data.response, 'bot');
+        
+        // Create bot message container for streaming
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message bot';
+        messageDiv.innerHTML = `
+          <div class="message-label">Maurice</div>
+          <div class="message-text"></div>
+        `;
+        messages.appendChild(messageDiv);
+        messages.scrollTop = messages.scrollHeight;
+        
+        const textDiv = messageDiv.querySelector('.message-text');
+        let fullResponse = '';
+        
+        // Read the stream
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                break;
+              }
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.token) {
+                  fullResponse += parsed.token;
+                  textDiv.innerHTML = formatResponse(fullResponse);
+                  messages.scrollTop = messages.scrollHeight;
+                }
+                if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+              } catch (e) {
+                // Skip malformed JSON
+              }
+            }
+          }
+        }
+        
+        // Check for images after streaming completes
+        const image = getImageForTopic(fullResponse);
+        if (image) {
+          const clickable = image.panel ? 'data-panel="' + encodeURIComponent(JSON.stringify(image.panel)) + '"' : '';
+          const clickClass = image.panel ? 'clickable' : '';
+          const imageHtml = `
+            <div class="message-image-wrapper ${clickClass}" ${clickable}>
+              <img src="${image.src}" alt="${image.alt}" class="message-image" onerror="this.parentElement.style.display='none'">
+              <div class="message-image-meta">
+                <span class="message-image-category">${image.category}</span>
+                <span class="message-image-caption">${image.alt}${image.panel ? ' ›' : ''}</span>
+              </div>
+            </div>
+          `;
+          textDiv.insertAdjacentHTML('afterend', imageHtml);
+        }
+        
       } catch (err) {
-        console.error('Fetch error:', err);
+        console.error('Stream error:', err);
         hideTyping();
         addMessage("Sorry, there are a lot of people talking in my ear at once. Try again in a moment?", 'bot');
       } finally {
@@ -852,6 +911,15 @@
         sendBtn.disabled = false;
         input.focus();
       }
+    }
+    
+    // Format response text (convert newlines, etc.)
+    function formatResponse(text) {
+      return text
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^/, '<p>')
+        .replace(/$/, '</p>');
     }
 
     sendBtn.addEventListener('click', sendMessage);

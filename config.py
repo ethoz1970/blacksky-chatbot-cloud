@@ -22,10 +22,10 @@ PINECONE_DIMENSION = 384  # Dimension for all-MiniLM-L6-v2 embeddings
 DOCS_DIR = Path(__file__).parent / "documents"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
-TOP_K = 5
+TOP_K = 3
 
 # Generation settings
-MAX_TOKENS = 350
+MAX_TOKENS = 250
 TEMPERATURE = 0.3
 TOP_P = 0.9
 
@@ -34,4 +34,4 @@ HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", 8000))
 
 # Conversation settings
-MAX_HISTORY_TURNS = 4
+MAX_HISTORY_TURNS = 2

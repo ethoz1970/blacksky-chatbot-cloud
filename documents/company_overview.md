@@ -1,8 +1,13 @@
 # Blacksky LLC - Company Overview
 
+
+**Metadata**
+- **Category:** Company Overview
+- **Ethos Alignment:** "Design Matters"
+- **Last Updated:** 2025-11-20
 ## About Us
 
-Blacksky LLC was founded with a mission to deliver exceptional technology solutions to organizations that need them most. We specialize in federal agency work, bringing enterprise-grade solutions to Treasury, DOT, NIH, FDA, OSHA, SEC, FSIS, and HHS.
+Blacksky LLC was founded with a mission to deliver exceptional technology solutions to organizations that need them most. We specialize in federal agency work, bringing enterprise-grade solutions from concept to reality.
 
 ## Our Services
 
@@ -15,6 +20,14 @@ Full-stack application development using modern frameworks and cloud-native arch
 ### Cloud Migration & DevOps
 We help organizations move to the cloud securely and efficiently. Our DevOps practice includes CI/CD pipeline development, infrastructure as code, and container orchestration with Kubernetes.
 
+
+### Consultation
+We are here to guide you even if we are not your choice to implement, perhaps you just need another set of eyes on your high level plans. We provide hourly or seminar style sessions for your orginzation.
+
+
+### Custom Chatbots
+There is a reason our chatbot is so much better than the normal. We can train your chatbot with opimized prompting and structured documents formatted for the best RAG systems.
+
 ### Data Engineering
 Building robust data pipelines, data lakes, and analytics platforms. We turn raw data into actionable insights.
 
@@ -26,8 +39,35 @@ Blacksky maintains active security clearances, enabling us to work on sensitive 
 
 For inquiries about our services, please reach out through our website or contact us directly.
 
+## Leadership
 
-## Project
+Our CEO Mario Moorhead is a Digital Architect with 25+ years designing and delivering enterprise-grade platforms for federal agencies, Fortune 500 companies, and high-traffic digital properties. Proven expertise architecting complex migrations, distributed systems, and API integrations serving millions of users. Specialized in modernizing legacy systems, establishing scalable cloud infrastructure (Azure, AWS, GCP), and leading technical teams through large-scale digital transformations. Deep technical foundation in LAMP stack, Drupal enterprise implementations, headless architectures, and search technologies (Solr). Background in UX design and education informs user-centered architectural decisions. 
+
+
+
+## PROFESSIONAL HIGHLIGHTS
+18+ years architecting enterprise platforms for federal agencies (Treasury, DOT, NIH, FDA, FSIS, HHS) and Fortune 500 companies (Vanguard, Mastercard, BCBS)
+Led 15+ migrations including SharePoint→Drupal, Adobe CMS→Drupal, Drupal 7→8→9→10, monolithic→headless architectures
+Systems serving 50M+ users across government and commercial sectors with 99.9%+ uptime requirements
+Federal security clearances including NIH background check; expert in FISMA compliance and government security protocols
+Technical team leadership for distributed teams of 3-20 developers with proven delivery track record
+Modern tech stack including Drupal 10/11, Python, Next.js, Kubernetes, Redis Cluster, cloud platforms (Azure/AWS/GCP), Apache Solr
+
+## RECENT PROJECTS
+U.S. Congressional Directory Platform (2024)Full-stack civic technology application integrating Congress.gov API for real-time legislative data. Architected Next.js frontend with Python FastAPI backend deployed on GCP. Features advanced filtering, detailed legislator profiles, and automated data synchronization serving public access to congressional information. Demonstrates complete ownership from architecture through production deployment.
+Technology Stack: Next.js, React, Python, FastAPI, Congress.gov API, Google Cloud Platform
+
+## CORE COMPETENCIES
+Technical Architecture: Distributed systems design, microservices architecture, API design & integration, headless CMS, cloud infrastructure (Azure, AWS, GCP), container orchestration (Kubernetes)
+Enterprise Platforms: Drupal 8/9/10/11, custom PHP frameworks, Oracle integration, database architecture (MySQL, Oracle 11g)
+Data & Search: Apache Solr, Elasticsearch, Redis Cluster, complex data migrations, ETL pipelines, AI integration services
+Development Leadership: Technical team leadership, code review standards, CI/CD pipeline design, agile methodologies, automated testing (PHPUnit, Behat)
+Federal Sector Expertise: NIH, FDA, Treasury, DOT, OSHA, SEC, FSIS, HHS clearances and compliance
+
+
+
+
+## Passion Project
 Technical deep-dive into my latest Blacksky project 🧵
 I built a voice-enabled domain expert AI to sharpen my ML engineering skills. Here's what I learned:
 The Challenge:
@@ -44,7 +84,7 @@ Local optimization matters: Fine-tuned Llama to run efficiently on Apple Silicon
 Voice cloning is nuanced: Balancing synthetic quality vs processing time required iteration
 End-to-end thinking: The pipeline matters as much as the model
 
-Why This Matters for Enterprises:
+## Why This Matters for Enterprises:
 This is exactly what organizations need—AI that understands their specific domain, not generic chatbots. Whether it's:
 
 Legal document analysis

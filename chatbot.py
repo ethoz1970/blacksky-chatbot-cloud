@@ -87,6 +87,58 @@ class BlackskyChatbot:
         
         return assistant_message
     
+    def chat_stream(self, user_message: str):
+        """Generate a streaming response to the user's message."""
+        if self.client is None:
+            raise RuntimeError("Client not initialized. Call initialize() first.")
+        
+        # Get RAG context if enabled
+        rag_context = ""
+        if self.use_rag and self.doc_store:
+            try:
+                rag_context = self.doc_store.get_context(user_message)
+            except Exception as e:
+                print(f"RAG error: {e}")
+        
+        # Build system prompt with optional RAG context
+        system_content = SYSTEM_PROMPT
+        if rag_context:
+            system_content = f"{SYSTEM_PROMPT}\n\n{rag_context}"
+        
+        # Build messages array
+        messages = [{"role": "system", "content": system_content}]
+        
+        # Add conversation history
+        for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
+            messages.append({"role": "user", "content": turn["user"]})
+            messages.append({"role": "assistant", "content": turn["assistant"]})
+        
+        # Add current user message
+        messages.append({"role": "user", "content": user_message})
+        
+        # Call Together AI with streaming
+        full_response = ""
+        stream = self.client.chat.completions.create(
+            model=TOGETHER_MODEL,
+            messages=messages,
+            max_tokens=MAX_TOKENS,
+            temperature=TEMPERATURE,
+            top_p=TOP_P,
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                token = chunk.choices[0].delta.content
+                full_response += token
+                yield token
+        
+        # Store in history after streaming completes
+        self.conversation_history.append({
+            "user": user_message,
+            "assistant": full_response.strip()
+        })
+    
     def clear_history(self):
         """Clear conversation history."""
         self.conversation_history = []

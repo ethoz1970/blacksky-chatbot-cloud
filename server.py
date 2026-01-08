@@ -4,11 +4,12 @@ FastAPI server for Blacksky Chatbot (Cloud Version)
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from pathlib import Path
 import time
+import json
 
 from chatbot import BlackskyChatbot
 from config import HOST, PORT, DOCS_DIR
@@ -85,6 +86,30 @@ async def chat(request: ChatRequest):
     return ChatResponse(
         response=response,
         response_time_ms=round(elapsed, 2)
+    )
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """Send a message and get a streaming response."""
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    
+    async def generate():
+        try:
+            for token in bot.chat_stream(request.message):
+                yield f"data: {json.dumps({'token': token})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
     )
 
 
