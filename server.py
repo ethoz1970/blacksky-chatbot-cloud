@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from pathlib import Path
+import asyncio
 import time
 import json
 
@@ -99,6 +100,7 @@ async def chat_stream(request: ChatRequest):
         try:
             for token in bot.chat_stream(request.message):
                 yield f"data: {json.dumps({'token': token})}\n\n"
+                await asyncio.sleep(0)  # Flush to client immediately
             yield "data: [DONE]\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
