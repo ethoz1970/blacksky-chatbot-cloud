@@ -39,11 +39,30 @@ class BlackskyChatbot:
         
         print()
         
-    def chat(self, user_message: str) -> str:
+    def _build_user_context_prompt(self, user_context: dict) -> str:
+        """Build a context string for returning users."""
+        if not user_context or not user_context.get("is_returning"):
+            return ""
+
+        parts = []
+        if user_context.get("name"):
+            parts.append(f"Returning user: {user_context['name']}")
+        else:
+            parts.append("Returning user (name unknown)")
+
+        if user_context.get("last_summary"):
+            parts.append(f"Previous conversation: {user_context['last_summary']}")
+
+        if user_context.get("last_interests"):
+            parts.append(f"Previous interests: {', '.join(user_context['last_interests'])}")
+
+        return "\n\nUSER CONTEXT:\n" + "\n".join(parts)
+
+    def chat(self, user_message: str, user_context: dict = None) -> str:
         """Generate a response to the user's message."""
         if self.client is None:
             raise RuntimeError("Client not initialized. Call initialize() first.")
-        
+
         # Get RAG context if enabled
         rag_context = ""
         if self.use_rag and self.doc_store:
@@ -51,23 +70,25 @@ class BlackskyChatbot:
                 rag_context = self.doc_store.get_context(user_message)
             except Exception as e:
                 print(f"RAG error: {e}")
-        
-        # Build system prompt with optional RAG context
+
+        # Build system prompt with optional RAG context and user context
         system_content = SYSTEM_PROMPT
         if rag_context:
             system_content = f"{SYSTEM_PROMPT}\n\n{rag_context}"
-        
+        if user_context:
+            system_content += self._build_user_context_prompt(user_context)
+
         # Build messages array
         messages = [{"role": "system", "content": system_content}]
-        
+
         # Add conversation history
         for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
             messages.append({"role": "user", "content": turn["user"]})
             messages.append({"role": "assistant", "content": turn["assistant"]})
-        
+
         # Add current user message
         messages.append({"role": "user", "content": user_message})
-        
+
         # Call Together AI
         response = self.client.chat.completions.create(
             model=TOGETHER_MODEL,
@@ -76,22 +97,22 @@ class BlackskyChatbot:
             temperature=TEMPERATURE,
             top_p=TOP_P,
         )
-        
+
         assistant_message = response.choices[0].message.content.strip()
-        
+
         # Store in history
         self.conversation_history.append({
             "user": user_message,
             "assistant": assistant_message
         })
-        
+
         return assistant_message
     
-    def chat_stream(self, user_message: str):
+    def chat_stream(self, user_message: str, user_context: dict = None):
         """Generate a streaming response to the user's message."""
         if self.client is None:
             raise RuntimeError("Client not initialized. Call initialize() first.")
-        
+
         # Get RAG context if enabled
         rag_context = ""
         if self.use_rag and self.doc_store:
@@ -99,23 +120,25 @@ class BlackskyChatbot:
                 rag_context = self.doc_store.get_context(user_message)
             except Exception as e:
                 print(f"RAG error: {e}")
-        
-        # Build system prompt with optional RAG context
+
+        # Build system prompt with optional RAG context and user context
         system_content = SYSTEM_PROMPT
         if rag_context:
             system_content = f"{SYSTEM_PROMPT}\n\n{rag_context}"
-        
+        if user_context:
+            system_content += self._build_user_context_prompt(user_context)
+
         # Build messages array
         messages = [{"role": "system", "content": system_content}]
-        
+
         # Add conversation history
         for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
             messages.append({"role": "user", "content": turn["user"]})
             messages.append({"role": "assistant", "content": turn["assistant"]})
-        
+
         # Add current user message
         messages.append({"role": "user", "content": user_message})
-        
+
         # Call Together AI with streaming
         full_response = ""
         stream = self.client.chat.completions.create(
@@ -126,13 +149,13 @@ class BlackskyChatbot:
             top_p=TOP_P,
             stream=True
         )
-        
+
         for chunk in stream:
             if chunk.choices[0].delta.content:
                 token = chunk.choices[0].delta.content
                 full_response += token
                 yield token
-        
+
         # Store in history after streaming completes
         self.conversation_history.append({
             "user": user_message,

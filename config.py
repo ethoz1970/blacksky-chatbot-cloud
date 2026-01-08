@@ -35,3 +35,9 @@ PORT = int(os.getenv("PORT", 8000))
 
 # Conversation settings
 MAX_HISTORY_TURNS = 2
+
+# Database settings (Railway auto-creates DATABASE_URL when you add Postgres)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Admin settings
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "changeme")

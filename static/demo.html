@@ -555,9 +555,70 @@
     const messages = document.getElementById('messages');
     const input = document.getElementById('input');
     const sendBtn = document.getElementById('send');
-    
+
     let isLoading = false;
     let hasMessages = true;
+    let conversationMessages = []; // Track messages for saving
+    let lastActivityTime = Date.now();
+    const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+    // Cookie utilities
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    }
+
+    function setCookie(name, value, days) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`;
+    }
+
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    // Get or create user ID
+    let userId = getCookie('blacksky_user_id');
+    if (!userId) {
+      userId = generateUUID();
+      setCookie('blacksky_user_id', userId, 30); // 30 day expiry
+    }
+
+    // Save conversation on page unload or inactivity
+    async function saveConversation() {
+      if (conversationMessages.length === 0) return;
+
+      try {
+        await fetch(`${API_HOST}/conversation/end`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            messages: conversationMessages
+          }),
+          keepalive: true // Ensure request completes even if page unloads
+        });
+      } catch (e) {
+        console.error('Failed to save conversation:', e);
+      }
+    }
+
+    // Handle page unload
+    window.addEventListener('beforeunload', saveConversation);
+
+    // Check for inactivity
+    setInterval(() => {
+      if (conversationMessages.length > 0 && Date.now() - lastActivityTime > INACTIVITY_TIMEOUT) {
+        saveConversation();
+        conversationMessages = []; // Reset after saving
+      }
+    }, 60000); // Check every minute
 
     function getImageForTopic(text) {
       const lower = text.toLowerCase();
@@ -820,7 +881,11 @@
       addMessage(text, 'user');
       input.value = '';
       autoResize();
-      
+
+      // Track message and update activity
+      conversationMessages.push({ role: 'user', content: text });
+      lastActivityTime = Date.now();
+
       isLoading = true;
       sendBtn.disabled = true;
       showTyping();
@@ -829,7 +894,7 @@
         const res = await fetch(`${API_HOST}/chat/stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
+          body: JSON.stringify({ message: text, user_id: userId })
         });
         
         if (!res.ok) {
@@ -884,7 +949,12 @@
             }
           }
         }
-        
+
+        // Track bot response
+        if (fullResponse) {
+          conversationMessages.push({ role: 'assistant', content: fullResponse });
+        }
+
         // Check for images after streaming completes
         const image = getImageForTopic(fullResponse);
         if (image) {

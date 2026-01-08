@@ -5,3 +5,5 @@ together>=1.0.0
 pinecone>=3.0.0
 sentence-transformers>=2.2.0
 python-multipart>=0.0.6
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
