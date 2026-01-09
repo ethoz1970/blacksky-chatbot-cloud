@@ -272,3 +272,90 @@ def get_leads(limit: int = 50) -> list:
         return []
     finally:
         session.close()
+
+
+def lookup_users_by_name(name: str) -> list:
+    """Find users by name for verification. Returns list with last conversation topic."""
+    session = get_session()
+    if session is None:
+        return []
+
+    try:
+        # Case-insensitive name search
+        users = (
+            session.query(User)
+            .filter(User.name.ilike(name))
+            .order_by(User.last_seen.desc())
+            .limit(5)
+            .all()
+        )
+
+        results = []
+        for user in users:
+            # Get last conversation for context
+            last_conv = (
+                session.query(Conversation)
+                .filter(Conversation.user_id == user.id)
+                .order_by(Conversation.created_at.desc())
+                .first()
+            )
+
+            results.append({
+                "user_id": str(user.id),
+                "name": user.name,
+                "last_topic": last_conv.summary if last_conv else None,
+                "last_interests": last_conv.interests if last_conv else [],
+                "last_seen": user.last_seen.isoformat() if user.last_seen else None
+            })
+
+        return results
+    except Exception as e:
+        print(f"Error looking up users by name: {e}")
+        return []
+    finally:
+        session.close()
+
+
+def link_users(current_user_id: str, target_user_id: str) -> bool:
+    """
+    Link current session to an existing user.
+    Moves conversations from current user to target user, then deletes current user.
+    """
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        current_uuid = uuid.UUID(current_user_id)
+        target_uuid = uuid.UUID(target_user_id)
+
+        # Don't link to self
+        if current_uuid == target_uuid:
+            return True
+
+        # Get both users
+        current_user = session.query(User).filter(User.id == current_uuid).first()
+        target_user = session.query(User).filter(User.id == target_uuid).first()
+
+        if not current_user or not target_user:
+            return False
+
+        # Move all conversations from current to target
+        session.query(Conversation).filter(
+            Conversation.user_id == current_uuid
+        ).update({"user_id": target_uuid})
+
+        # Update target user's last_seen
+        target_user.last_seen = datetime.utcnow()
+
+        # Delete the current (anonymous) user record
+        session.delete(current_user)
+
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error linking users: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()

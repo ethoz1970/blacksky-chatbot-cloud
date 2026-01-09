@@ -39,26 +39,36 @@ class BlackskyChatbot:
         
         print()
         
-    def _build_user_context_prompt(self, user_context: dict) -> str:
-        """Build a context string for returning users."""
-        if not user_context or not user_context.get("is_returning"):
-            return ""
-
+    def _build_user_context_prompt(self, user_context: dict, potential_matches: list = None) -> str:
+        """Build a context string for returning users and potential matches."""
         parts = []
-        if user_context.get("name"):
-            parts.append(f"Returning user: {user_context['name']}")
-        else:
-            parts.append("Returning user (name unknown)")
 
-        if user_context.get("last_summary"):
-            parts.append(f"Previous conversation: {user_context['last_summary']}")
+        # Add returning user context
+        if user_context and user_context.get("is_returning"):
+            if user_context.get("name"):
+                parts.append(f"Returning user: {user_context['name']}")
+            else:
+                parts.append("Returning user (name unknown)")
 
-        if user_context.get("last_interests"):
-            parts.append(f"Previous interests: {', '.join(user_context['last_interests'])}")
+            if user_context.get("last_summary"):
+                parts.append(f"Previous conversation: {user_context['last_summary']}")
+
+            if user_context.get("last_interests"):
+                parts.append(f"Previous interests: {', '.join(user_context['last_interests'])}")
+
+        # Add potential matches for verification
+        if potential_matches and len(potential_matches) > 0:
+            parts.append("\nPOTENTIAL MATCHES (user just provided their name - verify their identity):")
+            for i, match in enumerate(potential_matches[:3]):  # Max 3 matches
+                topic = match.get('last_topic', 'general questions')
+                parts.append(f"  - {match.get('name')} who previously asked about: {topic}")
+
+        if not parts:
+            return ""
 
         return "\n\nUSER CONTEXT:\n" + "\n".join(parts)
 
-    def chat(self, user_message: str, user_context: dict = None) -> str:
+    def chat(self, user_message: str, user_context: dict = None, potential_matches: list = None) -> str:
         """Generate a response to the user's message."""
         if self.client is None:
             raise RuntimeError("Client not initialized. Call initialize() first.")
@@ -75,8 +85,10 @@ class BlackskyChatbot:
         system_content = SYSTEM_PROMPT
         if rag_context:
             system_content = f"{SYSTEM_PROMPT}\n\n{rag_context}"
-        if user_context:
-            system_content += self._build_user_context_prompt(user_context)
+        # Add user context and potential matches
+        context_prompt = self._build_user_context_prompt(user_context, potential_matches)
+        if context_prompt:
+            system_content += context_prompt
 
         # Build messages array
         messages = [{"role": "system", "content": system_content}]
@@ -108,7 +120,7 @@ class BlackskyChatbot:
 
         return assistant_message
     
-    def chat_stream(self, user_message: str, user_context: dict = None):
+    def chat_stream(self, user_message: str, user_context: dict = None, potential_matches: list = None):
         """Generate a streaming response to the user's message."""
         if self.client is None:
             raise RuntimeError("Client not initialized. Call initialize() first.")
@@ -125,8 +137,10 @@ class BlackskyChatbot:
         system_content = SYSTEM_PROMPT
         if rag_context:
             system_content = f"{SYSTEM_PROMPT}\n\n{rag_context}"
-        if user_context:
-            system_content += self._build_user_context_prompt(user_context)
+        # Add user context and potential matches
+        context_prompt = self._build_user_context_prompt(user_context, potential_matches)
+        if context_prompt:
+            system_content += context_prompt
 
         # Build messages array
         messages = [{"role": "system", "content": system_content}]

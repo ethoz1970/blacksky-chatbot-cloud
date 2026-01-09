@@ -562,6 +562,10 @@
     let lastActivityTime = Date.now();
     const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
+    // User verification state
+    let pendingMatches = null; // Potential user matches waiting for verification
+    let awaitingVerification = false; // Are we waiting for user to confirm identity?
+
     // Cookie utilities
     function getCookie(name) {
       const value = `; ${document.cookie}`;
@@ -619,6 +623,68 @@
         conversationMessages = []; // Reset after saving
       }
     }, 60000); // Check every minute
+
+    // Detect if user message contains a name (after Maurice asked)
+    function extractNameFromMessage(text) {
+      const patterns = [
+        /(?:my name is|i'm|i am|call me|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+        /^([A-Z][a-z]+)(?:\s+here)?[.!]?$/i
+      ];
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match && match[1].length >= 2 && match[1].length <= 30) {
+          return match[1].trim();
+        }
+      }
+      return null;
+    }
+
+    // Check if user is confirming their identity
+    function isConfirmation(text) {
+      const confirmations = ['yes', 'yeah', 'yep', 'yup', 'that\'s me', 'thats me', 'correct', 'right', 'exactly', 'sure'];
+      return confirmations.some(c => text.toLowerCase().includes(c));
+    }
+
+    // Look up user by name
+    async function lookupUserByName(name) {
+      try {
+        const res = await fetch(`${API_HOST}/user/lookup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (e) {
+        console.error('User lookup failed:', e);
+        return null;
+      }
+    }
+
+    // Link current session to existing user
+    async function linkToUser(targetUserId) {
+      try {
+        const res = await fetch(`${API_HOST}/user/link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            current_user_id: userId,
+            target_user_id: targetUserId
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Update our userId to the linked user
+          userId = data.new_user_id;
+          setCookie('blacksky_user_id', userId, 30);
+          console.log('Session linked to existing user:', userId);
+          return true;
+        }
+      } catch (e) {
+        console.error('User link failed:', e);
+      }
+      return false;
+    }
 
     function getImageForTopic(text) {
       const lower = text.toLowerCase();
@@ -886,15 +952,51 @@
       conversationMessages.push({ role: 'user', content: text });
       lastActivityTime = Date.now();
 
+      // Check if user is confirming their identity
+      if (awaitingVerification && pendingMatches && pendingMatches.length > 0) {
+        if (isConfirmation(text)) {
+          // User confirmed - link to the first match
+          await linkToUser(pendingMatches[0].user_id);
+        }
+        // Reset verification state either way
+        awaitingVerification = false;
+        pendingMatches = null;
+      }
+
+      // Check if user just provided their name
+      const extractedName = extractNameFromMessage(text);
+      let matchesContext = null;
+
+      if (extractedName) {
+        const lookup = await lookupUserByName(extractedName);
+        if (lookup && lookup.count > 0) {
+          pendingMatches = lookup.matches;
+          awaitingVerification = true;
+          // Build context for Maurice to ask verification question
+          matchesContext = lookup.matches.map(m => ({
+            name: m.name,
+            last_topic: m.last_topic || 'general questions'
+          }));
+        }
+      }
+
       isLoading = true;
       sendBtn.disabled = true;
       showTyping();
 
       try {
+        // Build request body
+        const requestBody = { message: text, user_id: userId };
+
+        // Add potential matches for Maurice to verify
+        if (matchesContext) {
+          requestBody.potential_matches = matchesContext;
+        }
+
         const res = await fetch(`${API_HOST}/chat/stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, user_id: userId })
+          body: JSON.stringify(requestBody)
         });
         
         if (!res.ok) {

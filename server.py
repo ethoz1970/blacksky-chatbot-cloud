@@ -15,7 +15,10 @@ import json
 
 from chatbot import BlackskyChatbot
 from config import HOST, PORT, DOCS_DIR, ADMIN_PASSWORD
-from database import init_db, get_or_create_user, update_user, save_conversation, get_user_context, get_leads
+from database import (
+    init_db, get_or_create_user, update_user, save_conversation,
+    get_user_context, get_leads, lookup_users_by_name, link_users
+)
 
 # Paths
 STATIC_DIR = Path(__file__).parent / "static"
@@ -67,6 +70,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     user_id: Optional[str] = None
+    potential_matches: Optional[List[dict]] = None  # For user verification
 
 
 class ChatResponse(BaseModel):
@@ -84,6 +88,15 @@ class UserUpdateRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     company: Optional[str] = None
+
+
+class UserLookupRequest(BaseModel):
+    name: str
+
+
+class UserLinkRequest(BaseModel):
+    current_user_id: str
+    target_user_id: str
 
 
 @app.get("/")
@@ -131,7 +144,11 @@ async def chat(request: ChatRequest):
         user_context = get_user_context(request.user_id)
 
     start = time.time()
-    response = bot.chat(request.message, user_context=user_context)
+    response = bot.chat(
+        request.message,
+        user_context=user_context,
+        potential_matches=request.potential_matches
+    )
     elapsed = (time.time() - start) * 1000
 
     return ChatResponse(
@@ -154,7 +171,11 @@ async def chat_stream(request: ChatRequest):
 
     async def generate():
         try:
-            for token in bot.chat_stream(request.message, user_context=user_context):
+            for token in bot.chat_stream(
+                request.message,
+                user_context=user_context,
+                potential_matches=request.potential_matches
+            ):
                 yield f"data: {json.dumps({'token': token})}\n\n"
                 await asyncio.sleep(0)  # Flush to client immediately
             yield "data: [DONE]\n\n"
@@ -289,6 +310,36 @@ async def update_user_info(request: UserUpdateRequest):
     if result is None:
         raise HTTPException(status_code=404, detail="User not found")
     return result
+
+
+@app.post("/user/lookup")
+async def lookup_user(request: UserLookupRequest):
+    """Look up users by name for verification."""
+    if not request.name or len(request.name) < 2:
+        raise HTTPException(status_code=400, detail="Name must be at least 2 characters")
+
+    matches = lookup_users_by_name(request.name)
+    return {
+        "matches": matches,
+        "count": len(matches)
+    }
+
+
+@app.post("/user/link")
+async def link_user_sessions(request: UserLinkRequest):
+    """Link current session to an existing user (merge identities)."""
+    if not request.current_user_id or not request.target_user_id:
+        raise HTTPException(status_code=400, detail="Both user IDs required")
+
+    success = link_users(request.current_user_id, request.target_user_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to link users")
+
+    return {
+        "success": True,
+        "merged": True,
+        "new_user_id": request.target_user_id
+    }
 
 
 @app.get("/admin")
