@@ -163,7 +163,7 @@
     .messages {
       flex: 1;
       overflow-y: auto;
-      padding: 48px 0;
+      padding: 48px 0 120px;
       display: flex;
       flex-direction: column;
       gap: 32px;
@@ -276,11 +276,20 @@
     }
 
     .input-container {
-      padding: 32px 0 48px;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0a0a0a;
+      padding: 16px 32px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
       border-top: 1px solid #222;
+      z-index: 100;
     }
 
     .input-row {
+      max-width: 720px;
+      margin: 0 auto;
       display: flex;
       gap: 16px;
       align-items: flex-end;
@@ -357,6 +366,10 @@
       .header, .chat-container {
         padding-left: 20px;
         padding-right: 20px;
+      }
+      .input-container {
+        padding: 12px 20px;
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
       }
     }
 
@@ -525,16 +538,16 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="input-container">
-      <div class="input-row">
-        <textarea 
-          id="input" 
-          rows="1" 
-          placeholder="> Enter query"
-        ></textarea>
-        <button class="send-button" id="send">Send</button>
-      </div>
+  <div class="input-container">
+    <div class="input-row">
+      <textarea
+        id="input"
+        rows="1"
+        placeholder="> Enter query"
+      ></textarea>
+      <button class="send-button" id="send">Send</button>
     </div>
   </div>
 
