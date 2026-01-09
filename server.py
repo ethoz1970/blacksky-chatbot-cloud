@@ -96,6 +96,27 @@ async def root():
     }
 
 
+@app.get("/health/db")
+async def db_health():
+    """Check database connection."""
+    from database import get_session, DATABASE_URL
+
+    if not DATABASE_URL:
+        return {"status": "disabled", "reason": "DATABASE_URL not set"}
+
+    session = get_session()
+    if session is None:
+        return {"status": "error", "reason": "Could not create session"}
+
+    try:
+        # Try a simple query
+        session.execute("SELECT 1")
+        session.close()
+        return {"status": "connected", "database": "postgresql"}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Send a message and get a response."""
