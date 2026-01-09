@@ -1,0 +1,14 @@
+# Shared files between cloud and local repos
+# These files should be identical in both versions
+# Edit this list to add/remove files from sync
+
+# Maurice's personality and prompts
+prompts.py
+
+# Frontend UI
+static/demo.html
+static/panels.js
+static/panels.json
+
+# Static assets (synced as directory)
+# static/images/*
