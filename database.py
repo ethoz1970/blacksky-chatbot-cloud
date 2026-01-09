@@ -232,39 +232,43 @@ def get_leads(limit: int = 50) -> list:
         return []
 
     try:
-        # Get users with their highest lead score conversation
-        from sqlalchemy import func
-
-        results = (
-            session.query(
-                User,
-                func.max(Conversation.lead_score).label('max_score'),
-                func.max(Conversation.summary).label('last_summary'),
-                func.array_agg(func.distinct(func.unnest(Conversation.interests))).label('all_interests')
-            )
-            .outerjoin(Conversation)
-            .group_by(User.id)
-            .order_by(func.max(Conversation.lead_score).desc().nullslast(), User.last_seen.desc())
+        # Get all users, ordered by last_seen
+        users = (
+            session.query(User)
+            .order_by(User.last_seen.desc())
             .limit(limit)
             .all()
         )
 
         leads = []
-        for user, max_score, last_summary, all_interests in results:
+        for user in users:
+            # Get the best conversation for this user (highest lead score)
+            best_conv = (
+                session.query(Conversation)
+                .filter(Conversation.user_id == user.id)
+                .order_by(Conversation.lead_score.desc(), Conversation.created_at.desc())
+                .first()
+            )
+
             leads.append({
                 "id": str(user.id),
                 "name": user.name or "Anonymous",
                 "email": user.email,
                 "company": user.company,
-                "lead_score": max_score or 1,
-                "last_summary": last_summary,
-                "interests": [i for i in (all_interests or []) if i],
+                "lead_score": best_conv.lead_score if best_conv else 1,
+                "last_summary": best_conv.summary if best_conv else None,
+                "interests": best_conv.interests if best_conv else [],
                 "last_seen": user.last_seen.isoformat() if user.last_seen else None
             })
+
+        # Sort by lead score descending, then last_seen
+        leads.sort(key=lambda x: (-x["lead_score"], x["last_seen"] or ""), reverse=False)
 
         return leads
     except Exception as e:
         print(f"Error getting leads: {e}")
+        import traceback
+        traceback.print_exc()
         return []
     finally:
         session.close()
