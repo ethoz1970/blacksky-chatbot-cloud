@@ -30,6 +30,35 @@ STATIC_DIR.mkdir(exist_ok=True)
 bot = BlackskyChatbot(use_rag=True)
 
 
+def run_migrations():
+    """Run database migrations to add new columns if they don't exist."""
+    from database import get_session
+    from sqlalchemy import text
+
+    session = get_session()
+    if session is None:
+        return
+
+    try:
+        # Add status column if it doesn't exist
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'new'
+        """))
+
+        # Add notes column if it doesn't exist
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS notes TEXT
+        """))
+
+        session.commit()
+        print("Database migrations complete.")
+    except Exception as e:
+        print(f"Migration error (may be normal if columns exist): {e}")
+        session.rollback()
+    finally:
+        session.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize on startup."""
@@ -40,6 +69,8 @@ async def lifespan(app: FastAPI):
     db_ok = init_db()
     if db_ok:
         print("Memory system enabled.")
+        # Run migrations to add any new columns
+        run_migrations()
     else:
         print("Memory system disabled (no DATABASE_URL).")
 
