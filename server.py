@@ -380,30 +380,31 @@ async def admin_page(password: str = Query(...)):
         <h1>Maurice Leads Dashboard</h1>
         <table>
             <tr>
-                <th>Name</th>
-                <th>Company</th>
                 <th>Score</th>
-                <th>Interests</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Company</th>
+                <th>Last Topic</th>
                 <th>Last Seen</th>
             </tr>
     """
 
     for lead in leads:
         score = lead.get('lead_score', 1)
-        interests_html = ''.join([f'<span class="interest-tag">{i}</span>' for i in (lead.get('interests') or [])[:3]])
-        last_seen = lead.get('last_seen', '')[:10] if lead.get('last_seen') else 'Never'
+        score_color = "#4a4" if score >= 3 else "#aa4" if score >= 2 else "#666"
+        last_seen = lead.get('last_seen', '')[:10] if lead.get('last_seen') else '-'
+        last_summary = lead.get('last_summary') or '-'
+        if len(last_summary) > 50:
+            last_summary = last_summary[:50] + '...'
 
         html += f"""
             <tr>
-                <td>
-                    {lead.get('name', 'Anonymous')}
-                    {f"<br><span style='color:#666;font-size:11px'>{lead.get('email')}</span>" if lead.get('email') else ''}
-                    {f"<div class='summary'>{lead.get('last_summary')}</div>" if lead.get('last_summary') else ''}
-                </td>
+                <td style="color: {score_color}; font-weight: bold;">{score}</td>
+                <td>{lead.get('name', 'Anonymous')}</td>
+                <td>{lead.get('email') or '-'}</td>
                 <td>{lead.get('company') or '-'}</td>
-                <td><span class="score score-{score}">{score}/5</span></td>
-                <td class="interests">{interests_html or '-'}</td>
-                <td style="color:#666">{last_seen}</td>
+                <td style="color: #888;">{last_summary}</td>
+                <td style="color: #666;">{last_seen}</td>
             </tr>
         """
 
