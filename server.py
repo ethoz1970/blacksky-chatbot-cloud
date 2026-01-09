@@ -245,6 +245,11 @@ async def end_conversation(request: ConversationEndRequest):
     if not request.user_id or not request.messages:
         raise HTTPException(status_code=400, detail="user_id and messages required")
 
+    # Extract and save user's name if they provided it
+    extracted_name = extract_user_name(request.messages)
+    if extracted_name:
+        update_user(request.user_id, name=extracted_name)
+
     # Calculate lead score based on messages
     lead_score = calculate_lead_score(request.messages)
 
@@ -267,7 +272,8 @@ async def end_conversation(request: ConversationEndRequest):
     return {
         "saved": conv_id is not None,
         "conversation_id": conv_id,
-        "lead_score": lead_score
+        "lead_score": lead_score,
+        "name_extracted": extracted_name
     }
 
 
@@ -409,6 +415,32 @@ def generate_summary(messages: list) -> str:
     except Exception as e:
         print(f"Summary generation failed: {e}")
         return None
+
+
+def extract_user_name(messages: list) -> str:
+    """Extract user's name from conversation if they provided it."""
+    import re
+
+    name_patterns = [
+        r"(?:my name is|i'm|i am|call me|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
+        r"^([A-Z][a-z]+)(?:\s+here)?[.!]?$",  # Just "John" or "John here"
+    ]
+
+    for msg in messages:
+        if msg.get("role") != "user":
+            continue
+
+        text = msg.get("content", "").strip()
+
+        for pattern in name_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                name = match.group(1).strip()
+                # Basic validation - should be 2-30 chars, no numbers
+                if 2 <= len(name) <= 30 and not any(c.isdigit() for c in name):
+                    return name.title()
+
+    return None
 
 
 def extract_interests(messages: list) -> list:
