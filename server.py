@@ -99,6 +99,7 @@ async def root():
 @app.get("/health/db")
 async def db_health():
     """Check database connection."""
+    from sqlalchemy import text
     from database import get_session, DATABASE_URL
 
     if not DATABASE_URL:
@@ -110,7 +111,7 @@ async def db_health():
 
     try:
         # Try a simple query
-        session.execute("SELECT 1")
+        session.execute(text("SELECT 1"))
         session.close()
         return {"status": "connected", "database": "postgresql"}
     except Exception as e:
