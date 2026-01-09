@@ -349,6 +349,19 @@ async def update_user_info(request: UserUpdateRequest):
     return result
 
 
+@app.get("/user/{user_id}/context")
+async def get_user_context_endpoint(user_id: str):
+    """Get user context for avatar display."""
+    context = get_user_context(user_id)
+    if context is None:
+        return {"name": None, "is_returning": False}
+    return {
+        "name": context.get("name"),
+        "is_returning": context.get("is_returning", False),
+        "conversation_count": context.get("conversation_count", 0)
+    }
+
+
 @app.post("/user/lookup")
 async def lookup_user(request: UserLookupRequest):
     """Look up users by name for verification."""

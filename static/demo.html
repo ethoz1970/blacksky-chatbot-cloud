@@ -526,11 +526,108 @@
         max-width: 100%;
       }
     }
+
+    /* User Avatar */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .user-avatar {
+      position: relative;
+    }
+
+    .avatar-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #888;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .avatar-btn:hover {
+      border-color: #555;
+      color: #e0e0e0;
+    }
+
+    .avatar-btn.known {
+      background: #2a2a2a;
+      color: #e0e0e0;
+    }
+
+    .avatar-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      min-width: 160px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      transition: all 0.15s;
+      z-index: 200;
+    }
+
+    .avatar-dropdown.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .avatar-dropdown-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    .avatar-dropdown-header .user-name {
+      color: #e0e0e0;
+      font-weight: 500;
+    }
+
+    .avatar-dropdown-item {
+      padding: 12px 16px;
+      font-size: 0.8125rem;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .avatar-dropdown-item:hover {
+      background: #222;
+      color: #e0e0e0;
+    }
+
+    .avatar-dropdown-item:last-child {
+      border-radius: 0 0 4px 4px;
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="header-title" id="menuToggleTitle">Blacksky</div>
+    <div class="user-avatar">
+      <button class="avatar-btn" id="avatarBtn" title="User menu">?</button>
+      <div class="avatar-dropdown" id="avatarDropdown">
+        <div class="avatar-dropdown-header" id="avatarHeader">
+          <span id="avatarGreeting">Guest</span>
+        </div>
+        <div class="avatar-dropdown-item" id="avatarAction">Sign In</div>
+      </div>
+    </div>
   </div>
 
   <!-- Left Menu Panel -->
@@ -596,6 +693,108 @@
     // User verification state
     let pendingMatches = null; // Potential user matches waiting for verification
     let awaitingVerification = false; // Are we waiting for user to confirm identity?
+
+    // User identity state for avatar
+    let currentUserName = null;
+
+    // Avatar UI elements
+    const avatarBtn = document.getElementById('avatarBtn');
+    const avatarDropdown = document.getElementById('avatarDropdown');
+    const avatarGreeting = document.getElementById('avatarGreeting');
+    const avatarAction = document.getElementById('avatarAction');
+
+    // Update avatar display based on current user
+    function updateAvatarUI() {
+      if (currentUserName) {
+        avatarBtn.textContent = currentUserName.charAt(0).toUpperCase();
+        avatarBtn.classList.add('known');
+        avatarGreeting.innerHTML = 'Hello, <span class="user-name">' + currentUserName + '</span>';
+        avatarAction.textContent = 'Sign Out';
+      } else {
+        avatarBtn.textContent = '?';
+        avatarBtn.classList.remove('known');
+        avatarGreeting.textContent = 'Guest';
+        avatarAction.textContent = 'Sign In';
+      }
+    }
+
+    // Toggle dropdown
+    avatarBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      avatarDropdown.classList.toggle('active');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.user-avatar')) {
+        avatarDropdown.classList.remove('active');
+      }
+    });
+
+    // Handle sign in/out action
+    avatarAction.addEventListener('click', () => {
+      avatarDropdown.classList.remove('active');
+
+      if (currentUserName) {
+        // Sign out - forget the user
+        signOut();
+      } else {
+        // Sign in - prompt user to introduce themselves
+        signIn();
+      }
+    });
+
+    function signOut() {
+      // Generate new user ID
+      userId = generateUUID();
+      setCookie('blacksky_user_id', userId, 30);
+
+      // Clear user name
+      currentUserName = null;
+      updateAvatarUI();
+
+      // Reset conversation
+      conversationMessages = [];
+
+      // Clear chat and show fresh welcome
+      messages.innerHTML = `
+        <div class="message bot" style="flex:1;display:flex;align-items:center;justify-content:center;">
+          <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
+            <p style="font-size:1.5rem;color:#666;margin:0;">... hello world ...</p>
+          </div>
+        </div>
+      `;
+
+      // Reset verification state
+      pendingMatches = null;
+      awaitingVerification = false;
+    }
+
+    function signIn() {
+      // Send a message to prompt Maurice to ask for name
+      input.value = "Hi, I'd like to introduce myself";
+      sendMessage();
+    }
+
+    // Fetch user context on page load to check if Maurice knows them
+    async function fetchUserContext() {
+      try {
+        const res = await fetch(`${API_HOST}/user/${userId}/context`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.name) {
+            currentUserName = data.name;
+            updateAvatarUI();
+          }
+        }
+      } catch (e) {
+        // Silently fail - user is just anonymous
+        console.log('Could not fetch user context');
+      }
+    }
+
+    // Initialize avatar on page load
+    fetchUserContext();
 
     // Cookie utilities
     function getCookie(name) {
@@ -1230,7 +1429,12 @@
       if (awaitingVerification && pendingMatches && pendingMatches.length > 0) {
         if (isConfirmation(text)) {
           // User confirmed - link to the first match
-          await linkToUser(pendingMatches[0].user_id);
+          const linked = await linkToUser(pendingMatches[0].user_id);
+          if (linked) {
+            // Update avatar with confirmed name
+            currentUserName = pendingMatches[0].name;
+            updateAvatarUI();
+          }
         }
         // Reset verification state either way
         awaitingVerification = false;
@@ -1251,6 +1455,10 @@
             name: m.name,
             last_topic: m.last_topic || 'general questions'
           }));
+        } else {
+          // New user - update avatar with their name
+          currentUserName = extractedName;
+          updateAvatarUI();
         }
       }
 
