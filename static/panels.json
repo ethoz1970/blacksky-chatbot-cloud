@@ -253,6 +253,324 @@
       }
     ]
   },
+  "dot": {
+    "title": "DOT Project",
+    "image": "/static/images/transportation2.png.webp",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky developed a comprehensive infrastructure tracking dashboard for the Department of Transportation, enabling real-time monitoring of $100M+ in federal infrastructure projects."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Built interactive data visualization dashboard tracking project milestones, budgets, and completion status across multiple regions.",
+          "Implemented real-time reporting system integrating data from multiple DOT divisions.",
+          "Designed responsive interface for field engineers accessing project data on mobile devices."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 9, PHP, PostgreSQL, Chart.js, D3.js, AWS"
+        ]
+      }
+    ]
+  },
+  "sec": {
+    "title": "SEC Project",
+    "image": "/static/images/sec.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky contributed to the Securities and Exchange Commission's regulatory compliance platform, supporting document management and public disclosure requirements."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Enhanced document management workflows for regulatory filings and public disclosures.",
+          "Implemented Apache Solr search infrastructure for querying millions of financial documents.",
+          "Built automated compliance reporting tools for internal audit teams."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 8, PHP, Apache Solr, AWS, Docker"
+        ]
+      }
+    ]
+  },
+  "hhs": {
+    "title": "HHS Project",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky supported the Department of Health and Human Services with public health information portal development, serving millions of Americans seeking healthcare guidance."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Developed multi-site content architecture supporting HHS sub-agencies and regional offices.",
+          "Implemented accessibility-first design meeting Section 508 compliance requirements.",
+          "Built content syndication system for distributing health alerts across partner sites."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 9, PHP, Acquia Cloud, ElasticSearch"
+        ]
+      }
+    ]
+  },
+  "usaid": {
+    "title": "USAID Project",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky architected an international development program tracking platform for USAID, supporting grant management and program reporting across global initiatives."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Designed workflow system for tracking international development grants from application through completion.",
+          "Built multi-language content delivery supporting program information in 20+ languages.",
+          "Implemented data visualization tools for program impact reporting to Congress."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 8, PHP, AWS, PostgreSQL, React"
+        ]
+      }
+    ]
+  },
+  "bcbs": {
+    "title": "Blue Cross Blue Shield Project",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky led member portal modernization for Blue Cross Blue Shield, improving healthcare data integration and member self-service capabilities."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Modernized legacy member portal to responsive Drupal 9 platform serving 2M+ members.",
+          "Integrated real-time benefits and claims data from multiple backend healthcare systems.",
+          "Implemented HIPAA-compliant document management for explanation of benefits and medical records."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 9, PHP, Azure, HL7 FHIR, React"
+        ]
+      }
+    ]
+  },
+  "worldbank": {
+    "title": "World Bank Project",
+    "image": "/static/images/worldbank.png",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky developed a research publication platform for the World Bank, enabling global access to development economics research and policy documents."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Built multi-language content delivery system supporting publications in 7 official languages.",
+          "Implemented advanced search and filtering for 50,000+ research documents and datasets.",
+          "Designed API layer for programmatic access to World Bank research data."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 8, PHP, AWS, ElasticSearch, React"
+        ]
+      }
+    ]
+  },
+  "billboard": {
+    "title": "Billboard Project",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky contributed to Billboard's music industry data platform, supporting chart tracking, artist pages, and music industry analytics."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Enhanced chart tracking system processing real-time streaming and sales data.",
+          "Built artist profile pages integrating data from multiple music industry sources.",
+          "Implemented content recommendation engine for personalized music discovery."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 8, PHP, ElasticSearch, Redis, AWS"
+        ]
+      }
+    ]
+  },
+  "nga": {
+    "title": "National Gallery of Art Project",
+    "image": "/static/images/nga.png.webp",
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky developed a digital collections platform for the National Gallery of Art, enabling high-resolution image delivery and scholarly research access."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "Built IIIF-compliant image delivery system for 150,000+ artworks with deep zoom capabilities.",
+          "Implemented collection search and browse features with faceted filtering by artist, period, and medium.",
+          "Designed responsive gallery views for virtual exhibition experiences."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Drupal 9, PHP, IIIF, AWS S3, CloudFront, ElasticSearch"
+        ]
+      }
+    ]
+  },
+  "drupal": {
+    "title": "Drupal Expertise",
+    "image": null,
+    "content": [
+      {
+        "section": "Platform Expertise",
+        "text": [
+          "Blacksky brings 15+ years of enterprise Drupal development experience, from early Drupal 5 through the latest Drupal 10 release."
+        ]
+      },
+      {
+        "section": "Capabilities",
+        "text": [
+          "Custom module development for complex business requirements.",
+          "Large-scale migrations from legacy CMS platforms (SharePoint, Adobe, WordPress).",
+          "Performance optimization and caching strategies for high-traffic sites.",
+          "Security hardening and FISMA compliance for federal deployments."
+        ]
+      },
+      {
+        "section": "Version Experience",
+        "text": [
+          "Drupal 7, 8, 9, 10 - including major version upgrades and headless implementations"
+        ]
+      }
+    ]
+  },
+  "kubernetes": {
+    "title": "Kubernetes Expertise",
+    "image": null,
+    "content": [
+      {
+        "section": "Container Orchestration",
+        "text": [
+          "Blacksky implements Kubernetes-based deployments for high-availability, auto-scaling infrastructure that meets enterprise and federal requirements."
+        ]
+      },
+      {
+        "section": "Capabilities",
+        "text": [
+          "Azure Kubernetes Service (AKS) deployments for federal workloads.",
+          "Helm chart development for repeatable, version-controlled deployments.",
+          "Horizontal pod autoscaling based on custom metrics.",
+          "Ingress configuration and TLS certificate management."
+        ]
+      },
+      {
+        "section": "Project Example",
+        "text": [
+          "USDA FSIS: Deployed Redis Cluster on AKS, improving response times by 70% and reducing infrastructure costs by 40% through auto-scaling."
+        ]
+      }
+    ]
+  },
+  "azure": {
+    "title": "Azure Expertise",
+    "image": null,
+    "content": [
+      {
+        "section": "Cloud Platform",
+        "text": [
+          "Blacksky architects Azure-based solutions for enterprise and federal clients requiring FedRAMP compliance and government cloud deployments."
+        ]
+      },
+      {
+        "section": "Services",
+        "text": [
+          "Azure Kubernetes Service (AKS) for container orchestration.",
+          "Azure Cache for Redis - including Redis Cluster deployments.",
+          "Azure App Services for PaaS web hosting.",
+          "Azure DevOps for CI/CD pipelines."
+        ]
+      },
+      {
+        "section": "Compliance",
+        "text": [
+          "Experience with Azure Government cloud for federal workloads requiring FedRAMP High authorization."
+        ]
+      }
+    ]
+  },
+  "aws": {
+    "title": "AWS Expertise",
+    "image": null,
+    "content": [
+      {
+        "section": "Cloud Platform",
+        "text": [
+          "Blacksky implements AWS infrastructure for scalable, reliable application deployments across enterprise and federal environments."
+        ]
+      },
+      {
+        "section": "Services",
+        "text": [
+          "EC2, ECS, and Lambda for compute workloads.",
+          "S3 and CloudFront for content delivery and storage.",
+          "RDS and DynamoDB for database services.",
+          "ElastiCache for Redis and Memcached caching layers."
+        ]
+      },
+      {
+        "section": "Project Examples",
+        "text": [
+          "Vanguard: Multi-region deployment with CloudFront CDN.",
+          "World Bank: S3-based document storage with lifecycle policies.",
+          "SEC: ElasticSearch cluster on AWS for regulatory document search."
+        ]
+      }
+    ]
+  },
   "mission": {
     "title": "Our Mission",
     "image": null,

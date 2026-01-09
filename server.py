@@ -266,10 +266,11 @@ async def end_conversation(request: ConversationEndRequest):
     if not request.user_id or not request.messages:
         raise HTTPException(status_code=400, detail="user_id and messages required")
 
-    # Extract and save user's name if they provided it
+    # Extract and save user's name and email if they provided them
     extracted_name = extract_user_name(request.messages)
-    if extracted_name:
-        update_user(request.user_id, name=extracted_name)
+    extracted_email = extract_user_email(request.messages)
+    if extracted_name or extracted_email:
+        update_user(request.user_id, name=extracted_name, email=extracted_email)
 
     # Calculate lead score based on messages
     lead_score = calculate_lead_score(request.messages)
@@ -294,7 +295,8 @@ async def end_conversation(request: ConversationEndRequest):
         "saved": conv_id is not None,
         "conversation_id": conv_id,
         "lead_score": lead_score,
-        "name_extracted": extracted_name
+        "name_extracted": extracted_name,
+        "email_extracted": extracted_email
     }
 
 
@@ -490,6 +492,25 @@ def extract_user_name(messages: list) -> str:
                 # Basic validation - should be 2-30 chars, no numbers
                 if 2 <= len(name) <= 30 and not any(c.isdigit() for c in name):
                     return name.title()
+
+    return None
+
+
+def extract_user_email(messages: list) -> str:
+    """Extract user's email from conversation if they provided it."""
+    import re
+
+    # Standard email regex
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
+    for msg in messages:
+        if msg.get("role") != "user":
+            continue
+
+        text = msg.get("content", "")
+        match = re.search(email_pattern, text)
+        if match:
+            return match.group(0).lower()
 
     return None
 

@@ -152,16 +152,19 @@
 
     .chat-container {
       flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       max-width: 720px;
       width: 100%;
       margin: 0 auto;
       padding: 0 32px;
+      overflow: hidden;
     }
 
     .messages {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
       padding: 48px 0 120px;
       display: flex;
@@ -503,6 +506,21 @@
       border-color: #e0e0e0;
     }
 
+    .quote-block {
+      border-left: 2px solid #3a3a3a;
+      padding-left: 16px;
+      margin: 12px 0;
+      font-style: italic;
+      color: #aaa;
+    }
+
+    .quote-source {
+      color: #666;
+      font-size: 0.85em;
+      font-style: normal;
+      margin-top: 4px;
+    }
+
     @media (max-width: 640px) {
       .slideout-panel {
         max-width: 100%;
@@ -699,11 +717,8 @@
       return false;
     }
 
-    function getImageForTopic(text) {
-      const lower = text.toLowerCase();
-      
-      // Define panel content for each topic
-      const panels = {
+    // Global panels object for slideouts (accessible by both image cards and text links)
+    const panels = {
         treasury: {
           title: 'Treasury Project',
           content: `
@@ -810,39 +825,285 @@
             <div class="section-title">› Origin</div>
             <p>Blacksky started the way most good things do—with curiosity and a blinking cursor. Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. That obsession never faded. It just evolved.</p>
             <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft.</p>
-            
+
             <div class="section-title">› What We Do</div>
             <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like Treasury, NIH, FDA, and DOT. Fortune 500 companies like Vanguard and Mastercard.</p>
-            
+
             <div class="section-title">› The Name</div>
             <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible. It's potential—quiet, vast, and ready.</p>
           `
+        },
+        dot: {
+          title: 'DOT Project',
+          content: `
+            <img src="/static/images/transportation2.png.webp" alt="DOT" class="slideout-image" onerror="this.style.display='none'">
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky developed a comprehensive infrastructure tracking dashboard for the Department of Transportation, enabling real-time monitoring of $100M+ in federal infrastructure projects.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Built interactive data visualization dashboard tracking project milestones, budgets, and completion status across multiple regions.</p>
+            <p>Implemented real-time reporting system integrating data from multiple DOT divisions.</p>
+            <p>Designed responsive interface for field engineers accessing project data on mobile devices.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, PostgreSQL, Chart.js, D3.js, AWS</p>
+          `
+        },
+        sec: {
+          title: 'SEC Project',
+          content: `
+            <img src="/static/images/sec.png" alt="SEC" class="slideout-image" onerror="this.style.display='none'">
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky contributed to the Securities and Exchange Commission's regulatory compliance platform, supporting document management and public disclosure requirements.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Enhanced document management workflows for regulatory filings and public disclosures.</p>
+            <p>Implemented Apache Solr search infrastructure for querying millions of financial documents.</p>
+            <p>Built automated compliance reporting tools for internal audit teams.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 8, PHP, Apache Solr, AWS, Docker</p>
+          `
+        },
+        hhs: {
+          title: 'HHS Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky supported the Department of Health and Human Services with public health information portal development, serving millions of Americans seeking healthcare guidance.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Developed multi-site content architecture supporting HHS sub-agencies and regional offices.</p>
+            <p>Implemented accessibility-first design meeting Section 508 compliance requirements.</p>
+            <p>Built content syndication system for distributing health alerts across partner sites.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, Acquia Cloud, ElasticSearch</p>
+          `
+        },
+        usaid: {
+          title: 'USAID Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky architected an international development program tracking platform for USAID, supporting grant management and program reporting across global initiatives.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Designed workflow system for tracking international development grants from application through completion.</p>
+            <p>Built multi-language content delivery supporting program information in 20+ languages.</p>
+            <p>Implemented data visualization tools for program impact reporting to Congress.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 8, PHP, AWS, PostgreSQL, React</p>
+          `
+        },
+        bcbs: {
+          title: 'Blue Cross Blue Shield Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky led member portal modernization for Blue Cross Blue Shield, improving healthcare data integration and member self-service capabilities.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Modernized legacy member portal to responsive Drupal 9 platform serving 2M+ members.</p>
+            <p>Integrated real-time benefits and claims data from multiple backend healthcare systems.</p>
+            <p>Implemented HIPAA-compliant document management for explanation of benefits and medical records.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, Azure, HL7 FHIR, React</p>
+          `
+        },
+        worldbank: {
+          title: 'World Bank Project',
+          content: `
+            <img src="/static/images/worldbank.png" alt="World Bank" class="slideout-image" onerror="this.style.display='none'">
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky developed a research publication platform for the World Bank, enabling global access to development economics research and policy documents.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Built multi-language content delivery system supporting publications in 7 official languages.</p>
+            <p>Implemented advanced search and filtering for 50,000+ research documents and datasets.</p>
+            <p>Designed API layer for programmatic access to World Bank research data.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 8, PHP, AWS, ElasticSearch, React</p>
+          `
+        },
+        billboard: {
+          title: 'Billboard Project',
+          content: `
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky contributed to Billboard's music industry data platform, supporting chart tracking, artist pages, and music industry analytics.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Enhanced chart tracking system processing real-time streaming and sales data.</p>
+            <p>Built artist profile pages integrating data from multiple music industry sources.</p>
+            <p>Implemented content recommendation engine for personalized music discovery.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 8, PHP, ElasticSearch, Redis, AWS</p>
+          `
+        },
+        nga: {
+          title: 'National Gallery of Art Project',
+          content: `
+            <img src="/static/images/nga.png.webp" alt="National Gallery of Art" class="slideout-image" onerror="this.style.display='none'">
+            <div class="section-title">› Project Overview</div>
+            <p>Blacksky developed a digital collections platform for the National Gallery of Art, enabling high-resolution image delivery and scholarly research access.</p>
+
+            <div class="section-title">› Key Accomplishments</div>
+            <p>Built IIIF-compliant image delivery system for 150,000+ artworks with deep zoom capabilities.</p>
+            <p>Implemented collection search and browse features with faceted filtering by artist, period, and medium.</p>
+            <p>Designed responsive gallery views for virtual exhibition experiences.</p>
+
+            <div class="section-title">› Technologies</div>
+            <p>Drupal 9, PHP, IIIF, AWS S3, CloudFront, ElasticSearch</p>
+          `
+        },
+        drupal: {
+          title: 'Drupal Expertise',
+          content: `
+            <div class="section-title">› Platform Expertise</div>
+            <p>Blacksky brings 15+ years of enterprise Drupal development experience, from early Drupal 5 through the latest Drupal 10 release.</p>
+
+            <div class="section-title">› Capabilities</div>
+            <p>Custom module development for complex business requirements.</p>
+            <p>Large-scale migrations from legacy CMS platforms (SharePoint, Adobe, WordPress).</p>
+            <p>Performance optimization and caching strategies for high-traffic sites.</p>
+            <p>Security hardening and FISMA compliance for federal deployments.</p>
+
+            <div class="section-title">› Version Experience</div>
+            <p>Drupal 7, 8, 9, 10 - including major version upgrades and headless implementations</p>
+          `
+        },
+        kubernetes: {
+          title: 'Kubernetes Expertise',
+          content: `
+            <div class="section-title">› Container Orchestration</div>
+            <p>Blacksky implements Kubernetes-based deployments for high-availability, auto-scaling infrastructure that meets enterprise and federal requirements.</p>
+
+            <div class="section-title">› Capabilities</div>
+            <p>Azure Kubernetes Service (AKS) deployments for federal workloads.</p>
+            <p>Helm chart development for repeatable, version-controlled deployments.</p>
+            <p>Horizontal pod autoscaling based on custom metrics.</p>
+            <p>Ingress configuration and TLS certificate management.</p>
+
+            <div class="section-title">› Project Example</div>
+            <p>USDA FSIS: Deployed Redis Cluster on AKS, improving response times by 70% and reducing infrastructure costs by 40% through auto-scaling.</p>
+          `
+        },
+        azure: {
+          title: 'Azure Expertise',
+          content: `
+            <div class="section-title">› Cloud Platform</div>
+            <p>Blacksky architects Azure-based solutions for enterprise and federal clients requiring FedRAMP compliance and government cloud deployments.</p>
+
+            <div class="section-title">› Services</div>
+            <p>Azure Kubernetes Service (AKS) for container orchestration.</p>
+            <p>Azure Cache for Redis - including Redis Cluster deployments.</p>
+            <p>Azure App Services for PaaS web hosting.</p>
+            <p>Azure DevOps for CI/CD pipelines.</p>
+
+            <div class="section-title">› Compliance</div>
+            <p>Experience with Azure Government cloud for federal workloads requiring FedRAMP High authorization.</p>
+          `
+        },
+        aws: {
+          title: 'AWS Expertise',
+          content: `
+            <div class="section-title">› Cloud Platform</div>
+            <p>Blacksky implements AWS infrastructure for scalable, reliable application deployments across enterprise and federal environments.</p>
+
+            <div class="section-title">› Services</div>
+            <p>EC2, ECS, and Lambda for compute workloads.</p>
+            <p>S3 and CloudFront for content delivery and storage.</p>
+            <p>RDS and DynamoDB for database services.</p>
+            <p>ElastiCache for Redis and Memcached caching layers.</p>
+
+            <div class="section-title">› Project Examples</div>
+            <p>Vanguard: Multi-region deployment with CloudFront CDN.</p>
+            <p>World Bank: S3-based document storage with lifecycle policies.</p>
+            <p>SEC: ElasticSearch cluster on AWS for regulatory document search.</p>
+          `
         }
-      };
-      
+    };
+
+    // Convert entity names in text to clickable links
+    function addEntityLinks(text) {
+      const entities = [
+        { pattern: /\bTreasury\b/g, key: 'treasury' },
+        { pattern: /\bNIH\b/g, key: 'nih' },
+        { pattern: /\bFDA\b/g, key: 'fda' },
+        { pattern: /\bUSDA\b/g, key: 'usda' },
+        { pattern: /\bFSIS\b/g, key: 'usda' },
+        { pattern: /\bDOT\b/g, key: 'dot' },
+        { pattern: /\bSEC\b/g, key: 'sec' },
+        { pattern: /\bHHS\b/g, key: 'hhs' },
+        { pattern: /\bUSAID\b/g, key: 'usaid' },
+        { pattern: /\bVanguard\b/gi, key: 'vanguard' },
+        { pattern: /\bMastercard\b/gi, key: 'mastercard' },
+        { pattern: /\bBlue Cross\b/gi, key: 'bcbs' },
+        { pattern: /\bWorld Bank\b/gi, key: 'worldbank' },
+        { pattern: /\bBillboard\b/gi, key: 'billboard' },
+        { pattern: /\bNational Gallery\b/gi, key: 'nga' },
+        { pattern: /\bDrupal\b/gi, key: 'drupal' },
+        { pattern: /\bKubernetes\b/gi, key: 'kubernetes' },
+        { pattern: /\bAzure\b/gi, key: 'azure' },
+        { pattern: /\bAWS\b/g, key: 'aws' },
+      ];
+
+      for (const { pattern, key } of entities) {
+        text = text.replace(pattern, `<span class="inline-link" data-panel-key="${key}">$&</span>`);
+      }
+      return text;
+    }
+
+    // Format quotes from Bruce Lee, Frank Ocean, Robert Greene with styled blocks
+    function formatQuotes(text) {
+      // Pattern: "quote text" — Source (em-dash, en-dash, or hyphen)
+      text = text.replace(
+        /"([^"]+)"\s*[—–-]\s*(Bruce Lee|Frank Ocean|Robert Greene)/gi,
+        '<div class="quote-block">"$1"<div class="quote-source">— $2</div></div>'
+      );
+
+      // Pattern: As X said, "quote" or X once said, "quote"
+      text = text.replace(
+        /(?:As\s+)?(Bruce Lee|Frank Ocean|Robert Greene)\s+(?:once\s+)?said,?\s*"([^"]+)"/gi,
+        '<div class="quote-block">"$2"<div class="quote-source">— $1</div></div>'
+      );
+
+      // Pattern: Law X: "quote" (48 Laws of Power)
+      text = text.replace(
+        /(Law\s+\d+):\s*"([^"]+)"/gi,
+        '<div class="quote-block">"$2"<div class="quote-source">— $1, 48 Laws of Power</div></div>'
+      );
+
+      return text;
+    }
+
+    function getImageForTopic(text) {
+      const lower = text.toLowerCase();
+
       // Federal agencies
       if (lower.includes('treasury')) return { src: '/static/images/treasury.png', alt: 'U.S. Department of Treasury', category: 'Federal Agency', panel: panels.treasury };
       if (lower.includes('nih') || lower.includes('national institute of health')) return { src: '/static/images/nih.png', alt: 'National Institutes of Health', category: 'Federal Agency', panel: panels.nih };
       if (lower.includes('fda')) return { src: '/static/images/fda.png', alt: 'Food & Drug Administration', category: 'Federal Agency', panel: panels.fda };
       if (lower.includes('usda') || lower.includes('fsis') || lower.includes('food safety')) return { src: '/static/images/usda.png', alt: 'USDA Food Safety', category: 'Federal Agency', panel: panels.usda };
-      if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/dot.png', alt: 'Department of Transportation', category: 'Federal Agency', panel: null };
-      if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'Securities & Exchange Commission', category: 'Federal Agency', panel: null };
-      if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'Health & Human Services', category: 'Federal Agency', panel: null };
-      if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID', category: 'Federal Agency', panel: null };
-      
+      if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/transportation2.png.webp', alt: 'Department of Transportation', category: 'Federal Agency', panel: panels.dot };
+      if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'Securities & Exchange Commission', category: 'Federal Agency', panel: panels.sec };
+      if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'Health & Human Services', category: 'Federal Agency', panel: panels.hhs };
+      if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID', category: 'Federal Agency', panel: panels.usaid };
+
       // Companies
       if (lower.includes('vanguard')) return { src: '/static/images/vanguard.png', alt: 'Vanguard', category: 'Enterprise Client', panel: panels.vanguard };
       if (lower.includes('mastercard')) return { src: '/static/images/mastercard.png', alt: 'Mastercard', category: 'Enterprise Client', panel: panels.mastercard };
-      if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield', category: 'Enterprise Client', panel: null };
-      if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank', category: 'International', panel: null };
-      if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard', category: 'Media', panel: null };
-      if (lower.includes('national gallery') || lower.includes('art gallery')) return { src: '/static/images/nga.png', alt: 'National Gallery of Art', category: 'Cultural Institution', panel: null };
-      
+      if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield', category: 'Enterprise Client', panel: panels.bcbs };
+      if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank', category: 'International', panel: panels.worldbank };
+      if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard', category: 'Media', panel: panels.billboard };
+      if (lower.includes('national gallery') || lower.includes('art gallery')) return { src: '/static/images/nga.png.webp', alt: 'National Gallery of Art', category: 'Cultural Institution', panel: panels.nga };
+
       // Technologies
-      if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal', category: 'Technology', panel: null };
-      if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes', category: 'Technology', panel: null };
-      if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Microsoft Azure', category: 'Cloud Platform', panel: null };
-      if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'Amazon Web Services', category: 'Cloud Platform', panel: null };
+      if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal', category: 'Technology', panel: panels.drupal };
+      if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes', category: 'Technology', panel: panels.kubernetes };
+      if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Microsoft Azure', category: 'Cloud Platform', panel: panels.azure };
+      if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'Amazon Web Services', category: 'Cloud Platform', panel: panels.aws };
       
       return null;
     }
@@ -928,7 +1189,7 @@
       `;
       
       messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
+      div.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
 
     function showTyping() {
@@ -940,7 +1201,7 @@
         <div class="message-text"><span class="typing-indicator"></span></div>
       `;
       messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
+      div.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
 
     function hideTyping() {
@@ -1026,22 +1287,23 @@
           <div class="message-text"></div>
         `;
         messages.appendChild(messageDiv);
-        messages.scrollTop = messages.scrollHeight;
-        
+        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
         const textDiv = messageDiv.querySelector('.message-text');
         let fullResponse = '';
-        
+        let lastScrollTime = 0;
+
         // Read the stream
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
-        
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          
+
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n');
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const data = line.slice(6);
@@ -1053,7 +1315,12 @@
                 if (parsed.token) {
                   fullResponse += parsed.token;
                   textDiv.innerHTML = formatResponse(fullResponse);
-                  messages.scrollTop = messages.scrollHeight;
+                  // Throttle scroll to every 300ms to avoid jank
+                  const now = Date.now();
+                  if (now - lastScrollTime > 300) {
+                    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    lastScrollTime = now;
+                  }
                 }
                 if (parsed.error) {
                   throw new Error(parsed.error);
@@ -1064,6 +1331,8 @@
             }
           }
         }
+        // Final scroll after streaming completes
+        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
         // Track bot response
         if (fullResponse) {
@@ -1100,7 +1369,8 @@
     
     // Format response text (convert newlines, etc.)
     function formatResponse(text) {
-      return text
+      // Format quotes first, then add entity links, then paragraph formatting
+      return formatQuotes(addEntityLinks(text))
         .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>')
         .replace(/^/, '<p>')
@@ -1155,7 +1425,7 @@
       const inlineLink = e.target.closest('.inline-link');
       if (inlineLink && inlineLink.dataset.panelKey) {
         const key = inlineLink.dataset.panelKey;
-        const panels = getPanels();
+        // Use global panels object (not getPanels() which is async)
         if (panels[key]) {
           openPanel(panels[key]);
         }
@@ -1192,10 +1462,11 @@
     menuItems.forEach(item => {
       item.addEventListener('click', () => {
         const key = item.dataset.panelKey;
-        const panels = getPanels();
-        if (panels[key]) {
+        // Menu panels (who/what/why) load from panels.json
+        const menuPanels = getPanels();
+        if (menuPanels[key]) {
           closeMenu();
-          setTimeout(() => openPanel(panels[key]), 150);
+          setTimeout(() => openPanel(menuPanels[key]), 150);
         }
       });
     });
