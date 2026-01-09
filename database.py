@@ -28,6 +28,8 @@ class User(Base):
     name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     company = Column(String(255), nullable=True)
+    status = Column(String(20), default="new")  # new, contacted, qualified, converted, archived
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -108,6 +110,8 @@ def get_or_create_user(user_id: str) -> Optional[dict]:
             "name": user.name,
             "email": user.email,
             "company": user.company,
+            "status": user.status or "new",
+            "notes": user.notes,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "last_seen": user.last_seen.isoformat() if user.last_seen else None
         }
@@ -255,6 +259,8 @@ def get_leads(limit: int = 50) -> list:
                 "name": user.name or "Anonymous",
                 "email": user.email,
                 "company": user.company,
+                "status": user.status or "new",
+                "notes": user.notes,
                 "lead_score": best_conv.lead_score if best_conv else 1,
                 "last_summary": best_conv.summary if best_conv else None,
                 "interests": best_conv.interests if best_conv else [],
@@ -357,5 +363,195 @@ def link_users(current_user_id: str, target_user_id: str) -> bool:
         print(f"Error linking users: {e}")
         session.rollback()
         return False
+    finally:
+        session.close()
+
+
+def get_user_conversations(user_id: str) -> list:
+    """Get all conversations for a user with full message history."""
+    session = get_session()
+    if session is None:
+        return []
+
+    try:
+        user_uuid = uuid.UUID(user_id)
+        conversations = (
+            session.query(Conversation)
+            .filter(Conversation.user_id == user_uuid)
+            .order_by(Conversation.created_at.desc())
+            .all()
+        )
+
+        results = []
+        for conv in conversations:
+            results.append({
+                "id": conv.id,
+                "summary": conv.summary,
+                "interests": conv.interests or [],
+                "lead_score": conv.lead_score,
+                "messages": conv.messages or [],
+                "created_at": conv.created_at.isoformat() if conv.created_at else None
+            })
+
+        return results
+    except Exception as e:
+        print(f"Error getting user conversations: {e}")
+        return []
+    finally:
+        session.close()
+
+
+def update_lead_status(user_id: str, status: str) -> bool:
+    """Update a user's lead status."""
+    valid_statuses = ["new", "contacted", "qualified", "converted", "archived"]
+    if status not in valid_statuses:
+        return False
+
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        user_uuid = uuid.UUID(user_id)
+        user = session.query(User).filter(User.id == user_uuid).first()
+        if user is None:
+            return False
+
+        user.status = status
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating lead status: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def update_lead_notes(user_id: str, notes: str) -> bool:
+    """Update a user's notes."""
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        user_uuid = uuid.UUID(user_id)
+        user = session.query(User).filter(User.id == user_uuid).first()
+        if user is None:
+            return False
+
+        user.notes = notes
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating lead notes: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def get_lead_details(user_id: str) -> Optional[dict]:
+    """Get full lead details including all conversations."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user_uuid = uuid.UUID(user_id)
+        user = session.query(User).filter(User.id == user_uuid).first()
+        if user is None:
+            return None
+
+        conversations = get_user_conversations(user_id)
+
+        return {
+            "id": str(user.id),
+            "name": user.name or "Anonymous",
+            "email": user.email,
+            "company": user.company,
+            "status": user.status or "new",
+            "notes": user.notes,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_seen": user.last_seen.isoformat() if user.last_seen else None,
+            "conversations": conversations
+        }
+    except Exception as e:
+        print(f"Error getting lead details: {e}")
+        return None
+    finally:
+        session.close()
+
+
+def delete_user(user_id: str) -> bool:
+    """Delete a user and all their conversations."""
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        user_uuid = uuid.UUID(user_id)
+        user = session.query(User).filter(User.id == user_uuid).first()
+        if user is None:
+            return False
+
+        # Delete all conversations first (foreign key constraint)
+        session.query(Conversation).filter(Conversation.user_id == user_uuid).delete()
+
+        # Delete the user
+        session.delete(user)
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def get_analytics() -> dict:
+    """Get analytics data for the admin dashboard."""
+    session = get_session()
+    if session is None:
+        return {}
+
+    try:
+        from datetime import timedelta
+
+        # Total leads
+        total_leads = session.query(User).count()
+
+        # Leads by status
+        status_counts = {}
+        for status in ["new", "contacted", "qualified", "converted", "archived"]:
+            count = session.query(User).filter(User.status == status).count()
+            status_counts[status] = count
+
+        # Count users with no status as "new"
+        null_status_count = session.query(User).filter(User.status == None).count()
+        status_counts["new"] = status_counts.get("new", 0) + null_status_count
+
+        # Average lead score
+        conversations = session.query(Conversation).all()
+        if conversations:
+            scores = [c.lead_score for c in conversations if c.lead_score]
+            avg_score = sum(scores) / len(scores) if scores else 0
+        else:
+            avg_score = 0
+
+        # Leads this week
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        leads_this_week = session.query(User).filter(User.created_at >= week_ago).count()
+
+        return {
+            "total_leads": total_leads,
+            "status_counts": status_counts,
+            "avg_score": round(avg_score, 1),
+            "leads_this_week": leads_this_week
+        }
+    except Exception as e:
+        print(f"Error getting analytics: {e}")
+        return {}
     finally:
         session.close()

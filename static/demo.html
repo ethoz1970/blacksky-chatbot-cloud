@@ -1337,6 +1337,8 @@
         // Track bot response
         if (fullResponse) {
           conversationMessages.push({ role: 'assistant', content: fullResponse });
+          // Save conversation after each response
+          saveConversation();
         }
 
         // Check for images after streaming completes
