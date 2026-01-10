@@ -314,6 +314,9 @@ async def end_conversation(request: ConversationEndRequest):
     if not request.user_id or not request.messages:
         raise HTTPException(status_code=400, detail="user_id and messages required")
 
+    # Ensure user exists before saving conversation (required for PostgreSQL foreign key)
+    get_or_create_user(request.user_id)
+
     # Extract and save user's name, email, phone, and company if they provided them
     extracted_name = extract_user_name(request.messages)
     extracted_email = extract_user_email(request.messages)
