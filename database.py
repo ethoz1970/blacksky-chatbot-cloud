@@ -1,18 +1,17 @@
 """
 Database models and functions for Maurice memory system.
-Local SQLite version for development/testing.
+Cloud version using PostgreSQL via Railway.
 """
+import os
 import json
 from datetime import datetime
 from typing import Optional
-from pathlib import Path
 from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-# Local SQLite database
-DATABASE_PATH = Path(__file__).parent / "maurice.db"
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+# PostgreSQL database from Railway environment
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # SQLAlchemy setup
 Base = declarative_base()
@@ -56,13 +55,17 @@ def init_db():
     """Initialize database connection and create tables."""
     global engine, SessionLocal
 
+    if not DATABASE_URL:
+        print("DATABASE_URL not set - database disabled")
+        return False
+
     try:
-        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+        engine = create_engine(DATABASE_URL)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
         # Create tables if they don't exist
         Base.metadata.create_all(bind=engine)
-        print(f"SQLite database ready: {DATABASE_PATH}")
+        print("PostgreSQL database connected")
         return True
     except Exception as e:
         print(f"Database connection failed: {e}")
