@@ -875,6 +875,31 @@ async def delete_lead(user_id: str, password: str = Query(...)):
     return {"status": "deleted"}
 
 
+@app.delete("/admin/clear-all")
+async def clear_all_data(password: str = Query(...)):
+    """Clear all users and conversations from the database."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from database import get_session, User, Conversation
+    session = get_session()
+    if session is None:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    try:
+        # Delete all conversations first (foreign key constraint)
+        deleted_convs = session.query(Conversation).delete()
+        # Delete all users
+        deleted_users = session.query(User).delete()
+        session.commit()
+        return {"status": "cleared", "users_deleted": deleted_users, "conversations_deleted": deleted_convs}
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
 def calculate_lead_score(messages: list) -> int:
     """Score 1-5 based on intent signals."""
     high_intent_phrases = [
