@@ -160,12 +160,14 @@ def update_user(user_id: str, name: str = None, email: str = None, phone: str = 
 def save_conversation(user_id: str, messages: list, summary: str = None,
                       interests: list = None, lead_score: int = 1) -> Optional[int]:
     """Save a conversation. Returns conversation ID."""
+    print(f"[DB DEBUG] save_conversation called for user {user_id}")
     session = get_session()
     if session is None:
+        print("[DB DEBUG] Session is None!")
         return None
 
     try:
-        # Convert lists to JSON strings for SQLite
+        # Convert lists to JSON strings
         interests_json = json.dumps(interests) if interests else None
         messages_json = json.dumps(messages) if messages else None
 
@@ -179,9 +181,12 @@ def save_conversation(user_id: str, messages: list, summary: str = None,
         session.add(conversation)
         session.commit()
 
+        print(f"[DB DEBUG] Conversation saved with id {conversation.id}")
         return conversation.id
     except Exception as e:
-        print(f"Error saving conversation: {e}")
+        print(f"[DB DEBUG] Error saving conversation: {e}")
+        import traceback
+        traceback.print_exc()
         session.rollback()
         return None
     finally:

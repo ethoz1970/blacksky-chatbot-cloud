@@ -309,6 +309,8 @@ async def clear_documents():
 @app.post("/conversation/end")
 async def end_conversation(request: ConversationEndRequest):
     """Save conversation when user leaves or after inactivity."""
+    print(f"[DEBUG] /conversation/end called - user_id: {request.user_id}, messages: {len(request.messages) if request.messages else 0}, conv_id: {request.conversation_id}")
+
     if not request.user_id or not request.messages:
         raise HTTPException(status_code=400, detail="user_id and messages required")
 
@@ -322,6 +324,7 @@ async def end_conversation(request: ConversationEndRequest):
 
     # Calculate lead score based on messages
     lead_score = calculate_lead_score(request.messages)
+    print(f"[DEBUG] Lead score: {lead_score}")
 
     # Generate summary if lead score is high enough
     summary = None
@@ -333,6 +336,7 @@ async def end_conversation(request: ConversationEndRequest):
     # Save or update conversation
     if request.conversation_id:
         # Update existing conversation
+        print(f"[DEBUG] Updating existing conversation {request.conversation_id}")
         success = update_conversation(
             conversation_id=request.conversation_id,
             messages=request.messages,
@@ -344,6 +348,7 @@ async def end_conversation(request: ConversationEndRequest):
         status = "updated" if success else "update_failed"
     else:
         # Create new conversation
+        print(f"[DEBUG] Creating new conversation for user {request.user_id}")
         conv_id = save_conversation(
             user_id=request.user_id,
             messages=request.messages,
@@ -352,6 +357,8 @@ async def end_conversation(request: ConversationEndRequest):
             lead_score=lead_score
         )
         status = "saved" if conv_id else "save_failed"
+
+    print(f"[DEBUG] Result: status={status}, conv_id={conv_id}")
 
     return {
         "status": status,
