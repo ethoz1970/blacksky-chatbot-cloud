@@ -1,18 +1,18 @@
 """
 Database models and functions for Maurice memory system.
-Uses PostgreSQL via SQLAlchemy.
+Local SQLite version for development/testing.
 """
-import os
+import json
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ARRAY, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from pathlib import Path
+from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-import uuid
 
-# Database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Local SQLite database
+DATABASE_PATH = Path(__file__).parent / "maurice.db"
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 # SQLAlchemy setup
 Base = declarative_base()
@@ -24,9 +24,10 @@ class User(Base):
     """User model for tracking visitors."""
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True)  # UUID as string
     name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
     company = Column(String(255), nullable=True)
     status = Column(String(20), default="new")  # new, contacted, qualified, converted, archived
     notes = Column(Text, nullable=True)
@@ -41,11 +42,11 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    user_id = Column(String(36), ForeignKey("users.id"))
     summary = Column(Text, nullable=True)
-    interests = Column(ARRAY(String), nullable=True)
+    interests = Column(Text, nullable=True)  # JSON array as string
     lead_score = Column(Integer, default=1)
-    messages = Column(JSONB, nullable=True)
+    messages = Column(Text, nullable=True)  # JSON as string
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="conversations")
@@ -55,22 +56,13 @@ def init_db():
     """Initialize database connection and create tables."""
     global engine, SessionLocal
 
-    if not DATABASE_URL:
-        print("Warning: DATABASE_URL not set. Memory features disabled.")
-        return False
-
     try:
-        # Handle Railway's postgres:// vs postgresql:// URL format
-        db_url = DATABASE_URL
-        if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-        engine = create_engine(db_url)
+        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
         # Create tables if they don't exist
         Base.metadata.create_all(bind=engine)
-        print("Database connected and tables created.")
+        print(f"SQLite database ready: {DATABASE_PATH}")
         return True
     except Exception as e:
         print(f"Database connection failed: {e}")
@@ -91,12 +83,11 @@ def get_or_create_user(user_id: str) -> Optional[dict]:
         return None
 
     try:
-        user_uuid = uuid.UUID(user_id)
-        user = session.query(User).filter(User.id == user_uuid).first()
+        user = session.query(User).filter(User.id == user_id).first()
 
         if user is None:
             # Create new user
-            user = User(id=user_uuid)
+            user = User(id=user_id)
             session.add(user)
             session.commit()
             session.refresh(user)
@@ -106,9 +97,10 @@ def get_or_create_user(user_id: str) -> Optional[dict]:
             session.commit()
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name,
             "email": user.email,
+            "phone": user.phone,
             "company": user.company,
             "status": user.status or "new",
             "notes": user.notes,
@@ -123,15 +115,14 @@ def get_or_create_user(user_id: str) -> Optional[dict]:
         session.close()
 
 
-def update_user(user_id: str, name: str = None, email: str = None, company: str = None) -> Optional[dict]:
+def update_user(user_id: str, name: str = None, email: str = None, phone: str = None, company: str = None) -> Optional[dict]:
     """Update user information."""
     session = get_session()
     if session is None:
         return None
 
     try:
-        user_uuid = uuid.UUID(user_id)
-        user = session.query(User).filter(User.id == user_uuid).first()
+        user = session.query(User).filter(User.id == user_id).first()
 
         if user is None:
             return None
@@ -140,6 +131,8 @@ def update_user(user_id: str, name: str = None, email: str = None, company: str 
             user.name = name
         if email is not None:
             user.email = email
+        if phone is not None:
+            user.phone = phone
         if company is not None:
             user.company = company
 
@@ -147,9 +140,10 @@ def update_user(user_id: str, name: str = None, email: str = None, company: str 
         session.commit()
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name,
             "email": user.email,
+            "phone": user.phone,
             "company": user.company
         }
     except Exception as e:
@@ -168,13 +162,15 @@ def save_conversation(user_id: str, messages: list, summary: str = None,
         return None
 
     try:
-        user_uuid = uuid.UUID(user_id)
+        # Convert lists to JSON strings for SQLite
+        interests_json = json.dumps(interests) if interests else None
+        messages_json = json.dumps(messages) if messages else None
 
         conversation = Conversation(
-            user_id=user_uuid,
-            messages=messages,
+            user_id=user_id,
+            messages=messages_json,
             summary=summary,
-            interests=interests,
+            interests=interests_json,
             lead_score=lead_score
         )
         session.add(conversation)
@@ -189,6 +185,38 @@ def save_conversation(user_id: str, messages: list, summary: str = None,
         session.close()
 
 
+def update_conversation(conversation_id: int, messages: list, summary: str = None,
+                        interests: list = None, lead_score: int = None) -> bool:
+    """Update an existing conversation. Returns True on success."""
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        conversation = session.query(Conversation).filter(Conversation.id == conversation_id).first()
+        if conversation is None:
+            return False
+
+        # Update fields
+        if messages is not None:
+            conversation.messages = json.dumps(messages)
+        if summary is not None:
+            conversation.summary = summary
+        if interests is not None:
+            conversation.interests = json.dumps(interests)
+        if lead_score is not None:
+            conversation.lead_score = lead_score
+
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating conversation: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
 def get_user_context(user_id: str) -> Optional[dict]:
     """Get user info and last conversation summary for prompt injection."""
     session = get_session()
@@ -196,8 +224,7 @@ def get_user_context(user_id: str) -> Optional[dict]:
         return None
 
     try:
-        user_uuid = uuid.UUID(user_id)
-        user = session.query(User).filter(User.id == user_uuid).first()
+        user = session.query(User).filter(User.id == user_id).first()
 
         if user is None:
             return None
@@ -205,20 +232,29 @@ def get_user_context(user_id: str) -> Optional[dict]:
         # Get the most recent conversation
         last_conversation = (
             session.query(Conversation)
-            .filter(Conversation.user_id == user_uuid)
+            .filter(Conversation.user_id == user_id)
             .order_by(Conversation.created_at.desc())
             .first()
         )
 
+        # Parse JSON strings back to lists
+        last_interests = None
+        if last_conversation and last_conversation.interests:
+            try:
+                last_interests = json.loads(last_conversation.interests)
+            except:
+                last_interests = None
+
         context = {
-            "user_id": str(user.id),
+            "user_id": user.id,
             "name": user.name,
             "email": user.email,
+            "phone": user.phone,
             "company": user.company,
             "is_returning": last_conversation is not None,
             "last_summary": last_conversation.summary if last_conversation else None,
-            "last_interests": last_conversation.interests if last_conversation else None,
-            "conversation_count": session.query(Conversation).filter(Conversation.user_id == user_uuid).count()
+            "last_interests": last_interests,
+            "conversation_count": session.query(Conversation).filter(Conversation.user_id == user_id).count()
         }
 
         return context
@@ -254,8 +290,16 @@ def get_leads(limit: int = 50) -> list:
                 .first()
             )
 
+            # Parse interests JSON
+            interests = []
+            if best_conv and best_conv.interests:
+                try:
+                    interests = json.loads(best_conv.interests)
+                except:
+                    interests = []
+
             leads.append({
-                "id": str(user.id),
+                "id": user.id,
                 "name": user.name or "Anonymous",
                 "email": user.email,
                 "company": user.company,
@@ -263,7 +307,7 @@ def get_leads(limit: int = 50) -> list:
                 "notes": user.notes,
                 "lead_score": best_conv.lead_score if best_conv else 1,
                 "last_summary": best_conv.summary if best_conv else None,
-                "interests": best_conv.interests if best_conv else [],
+                "interests": interests,
                 "last_seen": user.last_seen.isoformat() if user.last_seen else None
             })
 
@@ -287,10 +331,10 @@ def lookup_users_by_name(name: str) -> list:
         return []
 
     try:
-        # Case-insensitive name search
+        # Case-insensitive name search (SQLite uses LIKE for this)
         users = (
             session.query(User)
-            .filter(User.name.ilike(name))
+            .filter(User.name.ilike(f"%{name}%"))
             .order_by(User.last_seen.desc())
             .limit(5)
             .all()
@@ -306,11 +350,19 @@ def lookup_users_by_name(name: str) -> list:
                 .first()
             )
 
+            # Parse interests JSON
+            last_interests = []
+            if last_conv and last_conv.interests:
+                try:
+                    last_interests = json.loads(last_conv.interests)
+                except:
+                    last_interests = []
+
             results.append({
-                "user_id": str(user.id),
+                "user_id": user.id,
                 "name": user.name,
                 "last_topic": last_conv.summary if last_conv else None,
-                "last_interests": last_conv.interests if last_conv else [],
+                "last_interests": last_interests,
                 "last_seen": user.last_seen.isoformat() if user.last_seen else None
             })
 
@@ -332,24 +384,21 @@ def link_users(current_user_id: str, target_user_id: str) -> bool:
         return False
 
     try:
-        current_uuid = uuid.UUID(current_user_id)
-        target_uuid = uuid.UUID(target_user_id)
-
         # Don't link to self
-        if current_uuid == target_uuid:
+        if current_user_id == target_user_id:
             return True
 
         # Get both users
-        current_user = session.query(User).filter(User.id == current_uuid).first()
-        target_user = session.query(User).filter(User.id == target_uuid).first()
+        current_user = session.query(User).filter(User.id == current_user_id).first()
+        target_user = session.query(User).filter(User.id == target_user_id).first()
 
         if not current_user or not target_user:
             return False
 
         # Move all conversations from current to target
         session.query(Conversation).filter(
-            Conversation.user_id == current_uuid
-        ).update({"user_id": target_uuid})
+            Conversation.user_id == current_user_id
+        ).update({"user_id": target_user_id})
 
         # Update target user's last_seen
         target_user.last_seen = datetime.utcnow()
@@ -374,22 +423,36 @@ def get_user_conversations(user_id: str) -> list:
         return []
 
     try:
-        user_uuid = uuid.UUID(user_id)
         conversations = (
             session.query(Conversation)
-            .filter(Conversation.user_id == user_uuid)
+            .filter(Conversation.user_id == user_id)
             .order_by(Conversation.created_at.desc())
             .all()
         )
 
         results = []
         for conv in conversations:
+            # Parse JSON strings
+            messages = []
+            if conv.messages:
+                try:
+                    messages = json.loads(conv.messages)
+                except:
+                    messages = []
+
+            interests = []
+            if conv.interests:
+                try:
+                    interests = json.loads(conv.interests)
+                except:
+                    interests = []
+
             results.append({
                 "id": conv.id,
                 "summary": conv.summary,
-                "interests": conv.interests or [],
+                "interests": interests,
                 "lead_score": conv.lead_score,
-                "messages": conv.messages or [],
+                "messages": messages,
                 "created_at": conv.created_at.isoformat() if conv.created_at else None
             })
 
@@ -412,8 +475,7 @@ def update_lead_status(user_id: str, status: str) -> bool:
         return False
 
     try:
-        user_uuid = uuid.UUID(user_id)
-        user = session.query(User).filter(User.id == user_uuid).first()
+        user = session.query(User).filter(User.id == user_id).first()
         if user is None:
             return False
 
@@ -435,8 +497,7 @@ def update_lead_notes(user_id: str, notes: str) -> bool:
         return False
 
     try:
-        user_uuid = uuid.UUID(user_id)
-        user = session.query(User).filter(User.id == user_uuid).first()
+        user = session.query(User).filter(User.id == user_id).first()
         if user is None:
             return False
 
@@ -458,15 +519,14 @@ def get_lead_details(user_id: str) -> Optional[dict]:
         return None
 
     try:
-        user_uuid = uuid.UUID(user_id)
-        user = session.query(User).filter(User.id == user_uuid).first()
+        user = session.query(User).filter(User.id == user_id).first()
         if user is None:
             return None
 
         conversations = get_user_conversations(user_id)
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name or "Anonymous",
             "email": user.email,
             "company": user.company,
@@ -490,13 +550,12 @@ def delete_user(user_id: str) -> bool:
         return False
 
     try:
-        user_uuid = uuid.UUID(user_id)
-        user = session.query(User).filter(User.id == user_uuid).first()
+        user = session.query(User).filter(User.id == user_id).first()
         if user is None:
             return False
 
         # Delete all conversations first (foreign key constraint)
-        session.query(Conversation).filter(Conversation.user_id == user_uuid).delete()
+        session.query(Conversation).filter(Conversation.user_id == user_id).delete()
 
         # Delete the user
         session.delete(user)

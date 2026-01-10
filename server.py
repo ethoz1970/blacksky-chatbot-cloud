@@ -12,11 +12,12 @@ from typing import Optional, List
 import asyncio
 import time
 import json
+import re
 
 from chatbot import BlackskyChatbot
 from config import HOST, PORT, DOCS_DIR, ADMIN_PASSWORD
 from database import (
-    init_db, get_or_create_user, update_user, save_conversation,
+    init_db, get_or_create_user, update_user, save_conversation, update_conversation,
     get_user_context, get_leads, lookup_users_by_name, link_users,
     get_lead_details, update_lead_status, update_lead_notes, get_user_conversations,
     delete_user, get_analytics
@@ -48,6 +49,11 @@ def run_migrations():
         # Add notes column if it doesn't exist
         session.execute(text("""
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notes TEXT
+        """))
+
+        # Add phone column if it doesn't exist
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
         """))
 
         session.commit()
@@ -101,9 +107,10 @@ app.add_middleware(
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = ""
     user_id: Optional[str] = None
     potential_matches: Optional[List[dict]] = None  # For user verification
+    introduce: Optional[bool] = False  # Flag to trigger Maurice introduction
 
 
 class ChatResponse(BaseModel):
@@ -114,6 +121,7 @@ class ChatResponse(BaseModel):
 class ConversationEndRequest(BaseModel):
     user_id: str
     messages: List[dict]
+    conversation_id: Optional[int] = None  # If provided, update existing; otherwise create new
 
 
 class UserUpdateRequest(BaseModel):
@@ -193,8 +201,13 @@ async def chat(request: ChatRequest):
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
     """Send a message and get a streaming response."""
-    if not request.message.strip():
+    # Handle introduction request (Sign In flow)
+    if request.introduce:
+        message = "[SYSTEM: The user just clicked 'Sign In'. Introduce yourself briefly as Maurice from Blacksky, and ask for their name so you can remember them next time. Keep it warm and concise.]"
+    elif not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
+    else:
+        message = request.message
 
     # Get user context if user_id provided
     user_context = None
@@ -205,7 +218,7 @@ async def chat_stream(request: ChatRequest):
     async def generate():
         try:
             for token in bot.chat_stream(
-                request.message,
+                message,
                 user_context=user_context,
                 potential_matches=request.potential_matches
             ):
@@ -299,12 +312,13 @@ async def end_conversation(request: ConversationEndRequest):
     if not request.user_id or not request.messages:
         raise HTTPException(status_code=400, detail="user_id and messages required")
 
-    # Extract and save user's name, email, and company if they provided them
+    # Extract and save user's name, email, phone, and company if they provided them
     extracted_name = extract_user_name(request.messages)
     extracted_email = extract_user_email(request.messages)
+    extracted_phone = extract_user_phone(request.messages)
     extracted_company = extract_user_company(request.messages)
-    if extracted_name or extracted_email or extracted_company:
-        update_user(request.user_id, name=extracted_name, email=extracted_email, company=extracted_company)
+    if extracted_name or extracted_email or extracted_phone or extracted_company:
+        update_user(request.user_id, name=extracted_name, email=extracted_email, phone=extracted_phone, company=extracted_company)
 
     # Calculate lead score based on messages
     lead_score = calculate_lead_score(request.messages)
@@ -316,21 +330,36 @@ async def end_conversation(request: ConversationEndRequest):
         summary = generate_summary(request.messages)
         interests = extract_interests(request.messages)
 
-    # Save to database
-    conv_id = save_conversation(
-        user_id=request.user_id,
-        messages=request.messages,
-        summary=summary,
-        interests=interests,
-        lead_score=lead_score
-    )
+    # Save or update conversation
+    if request.conversation_id:
+        # Update existing conversation
+        success = update_conversation(
+            conversation_id=request.conversation_id,
+            messages=request.messages,
+            summary=summary,
+            interests=interests,
+            lead_score=lead_score
+        )
+        conv_id = request.conversation_id if success else None
+        status = "updated" if success else "update_failed"
+    else:
+        # Create new conversation
+        conv_id = save_conversation(
+            user_id=request.user_id,
+            messages=request.messages,
+            summary=summary,
+            interests=interests,
+            lead_score=lead_score
+        )
+        status = "saved" if conv_id else "save_failed"
 
     return {
-        "saved": conv_id is not None,
+        "status": status,
         "conversation_id": conv_id,
         "lead_score": lead_score,
         "name_extracted": extracted_name,
         "email_extracted": extracted_email,
+        "phone_extracted": extracted_phone,
         "company_extracted": extracted_company
     }
 
@@ -357,6 +386,9 @@ async def get_user_context_endpoint(user_id: str):
         return {"name": None, "is_returning": False}
     return {
         "name": context.get("name"),
+        "email": context.get("email"),
+        "phone": context.get("phone"),
+        "company": context.get("company"),
         "is_returning": context.get("is_returning", False),
         "conversation_count": context.get("conversation_count", 0)
     }
@@ -964,6 +996,32 @@ def extract_user_company(messages: list) -> str:
                 company = match.group(1).strip().rstrip('.,')
                 if 2 <= len(company) <= 100:
                     return company.title()
+
+    return None
+
+
+def extract_user_phone(messages: list) -> str:
+    """Extract user's phone number from conversation if they provided it."""
+    phone_patterns = [
+        r"(?:my (?:phone|number|cell|mobile)(?: number)? is|phone[:\s]+|call me at|reach me at)\s*([\d\s\-\(\)\+\.]+)",
+        r"(\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})",
+        r"(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})",
+    ]
+
+    for msg in messages:
+        if msg.get("role") != "user":
+            continue
+
+        text = msg.get("content", "")
+
+        for pattern in phone_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                phone = match.group(1).strip()
+                # Clean up and validate - should have at least 10 digits
+                digits_only = re.sub(r'\D', '', phone)
+                if 10 <= len(digits_only) <= 15:
+                    return phone
 
     return None
 

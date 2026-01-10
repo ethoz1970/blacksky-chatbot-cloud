@@ -589,13 +589,28 @@
     .avatar-dropdown-header {
       padding: 12px 16px;
       border-bottom: 1px solid #333;
-      font-size: 0.75rem;
-      color: #888;
     }
 
     .avatar-dropdown-header .user-name {
       color: #e0e0e0;
       font-weight: 500;
+      font-size: 0.875rem;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .avatar-dropdown-header .user-detail {
+      color: #666;
+      font-size: 0.6875rem;
+      display: block;
+      margin-top: 4px;
+    }
+
+    .avatar-dropdown-header .user-detail-label {
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-right: 4px;
     }
 
     .avatar-dropdown-item {
@@ -613,6 +628,11 @@
 
     .avatar-dropdown-item:last-child {
       border-radius: 0 0 4px 4px;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
     }
   </style>
 </head>
@@ -647,9 +667,9 @@
 
   <div class="chat-container">
     <div class="messages" id="messages">
-      <div class="message bot" style="flex:1;display:flex;align-items:center;justify-content:center;">
+      <div class="message bot" id="welcomeMessage" style="flex:1;display:flex;align-items:center;justify-content:center;">
         <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
-          <p style="font-size:1.5rem;color:#666;margin:0;">... hello world ...</p>
+          <p style="font-size:1.5rem;color:#666;margin:0;"><span id="typewriterText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span></p>
         </div>
       </div>
     </div>
@@ -687,8 +707,41 @@
     let isLoading = false;
     let hasMessages = true;
     let conversationMessages = []; // Track messages for saving
+    let currentConversationId = null; // Track conversation ID for updates
     let lastActivityTime = Date.now();
     const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+    // Typewriter effect for welcome message
+    function typeWriter(text, elementId, speed = 80) {
+      const element = document.getElementById(elementId);
+      const cursor = document.getElementById('typewriterCursor');
+      if (!element) return;
+
+      let i = 0;
+      element.textContent = '';
+
+      function type() {
+        if (i < text.length) {
+          element.textContent += text.charAt(i);
+          i++;
+          setTimeout(type, speed);
+        }
+        // Cursor keeps blinking after typing is done
+      }
+      type();
+    }
+
+    // Show welcome message with typewriter effect
+    function showWelcomeMessage() {
+      messages.innerHTML = `
+        <div class="message bot" id="welcomeMessage" style="flex:1;display:flex;align-items:center;justify-content:center;">
+          <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
+            <p style="font-size:1.5rem;color:#666;margin:0;"><span id="typewriterText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span></p>
+          </div>
+        </div>
+      `;
+      typeWriter('... hello world ...', 'typewriterText', 80);
+    }
 
     // User verification state
     let pendingMatches = null; // Potential user matches waiting for verification
@@ -696,6 +749,9 @@
 
     // User identity state for avatar
     let currentUserName = null;
+    let currentUserEmail = null;
+    let currentUserPhone = null;
+    let currentUserCompany = null;
 
     // Avatar UI elements
     const avatarBtn = document.getElementById('avatarBtn');
@@ -708,7 +764,18 @@
       if (currentUserName) {
         avatarBtn.textContent = currentUserName.charAt(0).toUpperCase();
         avatarBtn.classList.add('known');
-        avatarGreeting.innerHTML = 'Hello, <span class="user-name">' + currentUserName + '</span>';
+
+        let html = '<span class="user-name">' + currentUserName + '</span>';
+        if (currentUserCompany) {
+          html += '<span class="user-detail"><span class="user-detail-label">Company:</span>' + currentUserCompany + '</span>';
+        }
+        if (currentUserEmail) {
+          html += '<span class="user-detail"><span class="user-detail-label">Email:</span>' + currentUserEmail + '</span>';
+        }
+        if (currentUserPhone) {
+          html += '<span class="user-detail"><span class="user-detail-label">Phone:</span>' + currentUserPhone + '</span>';
+        }
+        avatarGreeting.innerHTML = html;
         avatarAction.textContent = 'Sign Out';
       } else {
         avatarBtn.textContent = '?';
@@ -749,31 +816,109 @@
       userId = generateUUID();
       setCookie('blacksky_user_id', userId, 30);
 
-      // Clear user name
+      // Clear all user info
       currentUserName = null;
+      currentUserEmail = null;
+      currentUserPhone = null;
+      currentUserCompany = null;
       updateAvatarUI();
 
       // Reset conversation
       conversationMessages = [];
+      currentConversationId = null;
 
-      // Clear chat and show fresh welcome
-      messages.innerHTML = `
-        <div class="message bot" style="flex:1;display:flex;align-items:center;justify-content:center;">
-          <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
-            <p style="font-size:1.5rem;color:#666;margin:0;">... hello world ...</p>
-          </div>
-        </div>
-      `;
+      // Clear chat and show fresh welcome with typewriter effect
+      showWelcomeMessage();
 
       // Reset verification state
       pendingMatches = null;
       awaitingVerification = false;
     }
 
-    function signIn() {
-      // Send a message to prompt Maurice to ask for name
-      input.value = "Hi, I'd like to introduce myself";
-      sendMessage();
+    async function signIn() {
+      // Trigger Maurice to introduce himself (no user message shown)
+      if (isLoading) return;
+
+      isLoading = true;
+      sendBtn.disabled = true;
+      showTyping();
+
+      try {
+        const res = await fetch(`${API_HOST}/chat/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, introduce: true })
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        hideTyping();
+
+        // Create bot message container for streaming
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message bot';
+        messageDiv.innerHTML = `
+          <div class="message-label">Maurice</div>
+          <div class="message-text"></div>
+        `;
+        messages.appendChild(messageDiv);
+        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+        const textDiv = messageDiv.querySelector('.message-text');
+        let fullResponse = '';
+        let lastScrollTime = 0;
+
+        // Read the stream
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.token) {
+                  fullResponse += parsed.token;
+                  textDiv.innerHTML = formatResponse(fullResponse);
+                  const now = Date.now();
+                  if (now - lastScrollTime > 300) {
+                    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    lastScrollTime = now;
+                  }
+                }
+              } catch (e) {
+                // Skip malformed JSON
+              }
+            }
+          }
+        }
+
+        messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+        // Track Maurice's introduction in conversation
+        if (fullResponse) {
+          conversationMessages.push({ role: 'assistant', content: fullResponse });
+        }
+
+      } catch (err) {
+        console.error('Sign in error:', err);
+        hideTyping();
+        addMessage("Sorry, I couldn't introduce myself right now. Please try again.", 'bot');
+      } finally {
+        isLoading = false;
+        sendBtn.disabled = false;
+        input.focus();
+      }
     }
 
     // Fetch user context on page load to check if Maurice knows them
@@ -784,6 +929,9 @@
           const data = await res.json();
           if (data.name) {
             currentUserName = data.name;
+            currentUserEmail = data.email;
+            currentUserPhone = data.phone;
+            currentUserCompany = data.company;
             updateAvatarUI();
           }
         }
@@ -792,9 +940,6 @@
         console.log('Could not fetch user context');
       }
     }
-
-    // Initialize avatar on page load
-    fetchUserContext();
 
     // Cookie utilities
     function getCookie(name) {
@@ -824,20 +969,64 @@
       setCookie('blacksky_user_id', userId, 30); // 30 day expiry
     }
 
+    // Initialize avatar on page load (must be after userId is set)
+    fetchUserContext();
+
+    // Start typewriter effect for welcome message
+    typeWriter('... hello world ...', 'typewriterText', 80);
+
     // Save conversation on page unload or inactivity
     async function saveConversation() {
       if (conversationMessages.length === 0) return;
 
       try {
-        await fetch(`${API_HOST}/conversation/end`, {
+        const requestBody = {
+          user_id: userId,
+          messages: conversationMessages
+        };
+
+        // Include conversation_id if we have one (for updates)
+        if (currentConversationId) {
+          requestBody.conversation_id = currentConversationId;
+        }
+
+        const res = await fetch(`${API_HOST}/conversation/end`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            messages: conversationMessages
-          }),
+          body: JSON.stringify(requestBody),
           keepalive: true // Ensure request completes even if page unloads
         });
+
+        // Check if user info was extracted and update avatar
+        if (res.ok) {
+          const data = await res.json();
+
+          // Store conversation ID for future updates
+          if (data.conversation_id && !currentConversationId) {
+            currentConversationId = data.conversation_id;
+          }
+
+          let updated = false;
+          if (data.name_extracted && !currentUserName) {
+            currentUserName = data.name_extracted;
+            updated = true;
+          }
+          if (data.email_extracted && !currentUserEmail) {
+            currentUserEmail = data.email_extracted;
+            updated = true;
+          }
+          if (data.phone_extracted && !currentUserPhone) {
+            currentUserPhone = data.phone_extracted;
+            updated = true;
+          }
+          if (data.company_extracted && !currentUserCompany) {
+            currentUserCompany = data.company_extracted;
+            updated = true;
+          }
+          if (updated) {
+            updateAvatarUI();
+          }
+        }
       } catch (e) {
         console.error('Failed to save conversation:', e);
       }
@@ -857,13 +1046,15 @@
     // Detect if user message contains a name (after Maurice asked)
     function extractNameFromMessage(text) {
       const patterns = [
-        /(?:my name is|i'm|i am|call me|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
-        /^([A-Z][a-z]+)(?:\s+here)?[.!]?$/i
+        /(?:my name is|i'm|i am|call me|this is)\s+([a-z]+(?:\s+[a-z]+){0,2})/i,
+        /^([a-z]+)(?:\s+here)?[.!]?$/i
       ];
       for (const pattern of patterns) {
         const match = text.match(pattern);
         if (match && match[1].length >= 2 && match[1].length <= 30) {
-          return match[1].trim();
+          // Capitalize first letter of each word
+          const name = match[1].trim().replace(/\b\w/g, c => c.toUpperCase());
+          return name;
         }
       }
       return null;
@@ -1416,6 +1607,12 @@
     async function sendMessage() {
       const text = input.value.trim();
       if (!text || isLoading) return;
+
+      // Hide welcome message cursor and remove welcome message on first prompt
+      const welcomeMsg = document.getElementById('welcomeMessage');
+      if (welcomeMsg) {
+        welcomeMsg.remove();
+      }
 
       addMessage(text, 'user');
       input.value = '';
