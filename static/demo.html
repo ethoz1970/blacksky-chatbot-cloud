@@ -670,6 +670,7 @@
       <div class="message bot" id="welcomeMessage" style="flex:1;display:flex;align-items:center;justify-content:center;">
         <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
           <p style="font-size:1.5rem;color:#666;margin:0;"><span id="typewriterText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span></p>
+          <p id="followUpLine" style="font-size:1rem;color:#555;margin:0.5rem 0 0 0;display:none;"></p>
         </div>
       </div>
     </div>
@@ -710,11 +711,11 @@
     let currentConversationId = null; // Track conversation ID for updates
     let lastActivityTime = Date.now();
     const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+    let followUpTimer = null; // Timer for follow-up message
 
     // Typewriter effect for welcome message
-    function typeWriter(text, elementId, speed = 80) {
+    function typeWriter(text, elementId, speed = 80, onComplete = null) {
       const element = document.getElementById(elementId);
-      const cursor = document.getElementById('typewriterCursor');
       if (!element) return;
 
       let i = 0;
@@ -725,10 +726,34 @@
           element.textContent += text.charAt(i);
           i++;
           setTimeout(type, speed);
+        } else if (onComplete) {
+          onComplete();
         }
-        // Cursor keeps blinking after typing is done
       }
       type();
+    }
+
+    // Start follow-up message after delay
+    function startFollowUpTimer() {
+      followUpTimer = setTimeout(() => {
+        const followUpLine = document.getElementById('followUpLine');
+        const cursor = document.getElementById('typewriterCursor');
+        if (followUpLine && cursor) {
+          // Move cursor to follow-up line
+          cursor.remove();
+          followUpLine.innerHTML = '<span id="followUpText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span>';
+          followUpLine.style.display = 'block';
+          typeWriter('I am Maurice, the Blacksky AI. Ask me about our work.', 'followUpText', 50);
+        }
+      }, 7000); // 7 seconds
+    }
+
+    // Cancel follow-up timer
+    function cancelFollowUpTimer() {
+      if (followUpTimer) {
+        clearTimeout(followUpTimer);
+        followUpTimer = null;
+      }
     }
 
     // Show welcome message with typewriter effect
@@ -737,10 +762,11 @@
         <div class="message bot" id="welcomeMessage" style="flex:1;display:flex;align-items:center;justify-content:center;">
           <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
             <p style="font-size:1.5rem;color:#666;margin:0;"><span id="typewriterText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span></p>
+            <p id="followUpLine" style="font-size:1rem;color:#555;margin:0.5rem 0 0 0;display:none;"></p>
           </div>
         </div>
       `;
-      typeWriter('... hello world ...', 'typewriterText', 80);
+      typeWriter('... hello world ...', 'typewriterText', 80, startFollowUpTimer);
     }
 
     // User verification state
@@ -973,7 +999,7 @@
     fetchUserContext();
 
     // Start typewriter effect for welcome message
-    typeWriter('... hello world ...', 'typewriterText', 80);
+    typeWriter('... hello world ...', 'typewriterText', 80, startFollowUpTimer);
 
     // Save conversation on page unload or inactivity
     async function saveConversation() {
@@ -1611,6 +1637,7 @@
       // Hide welcome message cursor and remove welcome message on first prompt
       const welcomeMsg = document.getElementById('welcomeMessage');
       if (welcomeMsg) {
+        cancelFollowUpTimer();
         welcomeMsg.remove();
       }
 
