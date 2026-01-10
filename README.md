@@ -125,3 +125,4 @@ blacksky-chatbot/
 ## License
 
 Proprietary - Blacksky LLC
+# Google OAuth added
