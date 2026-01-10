@@ -919,13 +919,15 @@ def generate_summary(messages: list) -> str:
 
 
 def extract_user_name(messages: list) -> str:
-    """Extract user's name from conversation if they provided it."""
+    """Extract user's name from conversation if they provided it.
+
+    Only matches explicit name declarations to avoid false positives.
+    """
     import re
 
-    # Capture up to 3 name parts
+    # Only match explicit name patterns - removed standalone capitalized word pattern
     name_patterns = [
         r"(?:my name is|i'm|i am|call me|this is)\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})",
-        r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s+here)?[.!]?$",
     ]
 
     # Words that signal end of name
