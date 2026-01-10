@@ -41,3 +41,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Admin settings
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "changeme")
+
+# Google OAuth settings
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://blacksky-chat.us/auth/google/callback")
+
+# Session security
+SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "dev-secret-key-change-in-prod")

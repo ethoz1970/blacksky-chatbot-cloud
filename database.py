@@ -6,7 +6,7 @@ import os
 import json
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey, JSON, text
+from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey, JSON, text, Boolean, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -32,6 +32,13 @@ class User(Base):
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Google OAuth fields
+    google_id = Column(String(255), nullable=True, unique=True, index=True)
+    google_email = Column(String(255), nullable=True)
+    google_name = Column(String(255), nullable=True)
+    google_picture = Column(String(500), nullable=True)
+    auth_method = Column(String(20), default="soft")  # "soft" or "google"
 
     conversations = relationship("Conversation", back_populates="user")
 
@@ -195,6 +202,122 @@ def update_user(user_id: str, name: str = None, email: str = None, phone: str = 
         session.close()
 
 
+def get_user_by_google_id(google_id: str) -> Optional[dict]:
+    """Find user by Google OAuth ID."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = session.query(User).filter(User.google_id == google_id).first()
+
+        if user is None:
+            return None
+
+        return {
+            "id": user.id,
+            "name": user.name or user.google_name,
+            "email": user.email or user.google_email,
+            "phone": user.phone,
+            "company": user.company,
+            "google_id": user.google_id,
+            "google_email": user.google_email,
+            "google_name": user.google_name,
+            "google_picture": user.google_picture,
+            "auth_method": user.auth_method,
+            "status": user.status or "new",
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_seen": user.last_seen.isoformat() if user.last_seen else None
+        }
+    except Exception as e:
+        print(f"Error getting user by Google ID: {e}")
+        return None
+    finally:
+        session.close()
+
+
+def create_google_user(user_id: str, google_id: str, google_email: str,
+                       google_name: str, google_picture: str) -> Optional[dict]:
+    """Create a new user with Google OAuth."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = User(
+            id=user_id,
+            google_id=google_id,
+            google_email=google_email,
+            google_name=google_name,
+            google_picture=google_picture,
+            name=google_name,
+            email=google_email,
+            auth_method="google"
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        return {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "google_id": user.google_id,
+            "google_picture": user.google_picture,
+            "auth_method": user.auth_method
+        }
+    except Exception as e:
+        print(f"Error creating Google user: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
+def link_google_account(user_id: str, google_id: str, google_email: str,
+                        google_name: str, google_picture: str) -> Optional[dict]:
+    """Link Google account to existing user."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+
+        if user is None:
+            return None
+
+        user.google_id = google_id
+        user.google_email = google_email
+        user.google_name = google_name
+        user.google_picture = google_picture
+        user.auth_method = "google"
+
+        # Update name/email if not already set
+        if not user.name:
+            user.name = google_name
+        if not user.email:
+            user.email = google_email
+
+        user.last_seen = datetime.utcnow()
+        session.commit()
+
+        return {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "google_id": user.google_id,
+            "google_picture": user.google_picture,
+            "auth_method": user.auth_method
+        }
+    except Exception as e:
+        print(f"Error linking Google account: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
 def save_conversation(user_id: str, messages: list, summary: str = None,
                       interests: list = None, lead_score: int = 1) -> Optional[int]:
     """Save a conversation. Returns conversation ID."""
@@ -292,7 +415,9 @@ def get_user_context(user_id: str) -> Optional[dict]:
             "is_returning": last_conversation is not None,
             "last_summary": last_conversation.summary if last_conversation else None,
             "last_interests": last_interests,
-            "conversation_count": session.query(Conversation).filter(Conversation.user_id == user_id).count()
+            "conversation_count": session.query(Conversation).filter(Conversation.user_id == user_id).count(),
+            "auth_method": user.auth_method,
+            "google_picture": user.google_picture
         }
 
         return context

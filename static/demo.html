@@ -630,6 +630,40 @@
       border-radius: 0 0 4px 4px;
     }
 
+    .avatar-dropdown-item.google-signin {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+
+    .avatar-dropdown-item.google-signin:hover {
+      background: #1a3a1a;
+    }
+
+    .google-signin img {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+    }
+
+    .avatar-btn.google-auth {
+      background: #2a3a4a;
+      border-color: #4285f4;
+    }
+
+    .avatar-btn.google-auth img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .verified-badge {
+      color: #4285f4;
+      font-size: 0.7em;
+      margin-left: 4px;
+    }
+
     @keyframes blink {
       0%, 50% { opacity: 1; }
       51%, 100% { opacity: 0; }
@@ -645,7 +679,17 @@
         <div class="avatar-dropdown-header" id="avatarHeader">
           <span id="avatarGreeting">Guest</span>
         </div>
-        <div class="avatar-dropdown-item" id="avatarAction">Sign In</div>
+        <div class="avatar-dropdown-item google-signin" id="googleSignIn">
+          <svg width="18" height="18" viewBox="0 0 24 24" style="margin-right: 8px;">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Sign in with Google
+        </div>
+        <div class="avatar-dropdown-item" id="softSignIn">Sign In</div>
+        <div class="avatar-dropdown-item" id="signOut" style="display: none;">Sign Out</div>
       </div>
     </div>
   </div>
@@ -779,17 +823,43 @@
     let currentUserPhone = null;
     let currentUserCompany = null;
 
+    // Google auth state
+    let googleAuthToken = localStorage.getItem('blacksky_auth_token');
+    let googleUserPicture = null;
+    let isGoogleAuth = false;
+
     // Avatar UI elements
     const avatarBtn = document.getElementById('avatarBtn');
     const avatarDropdown = document.getElementById('avatarDropdown');
     const avatarGreeting = document.getElementById('avatarGreeting');
-    const avatarAction = document.getElementById('avatarAction');
+    const googleSignInBtn = document.getElementById('googleSignIn');
+    const softSignInBtn = document.getElementById('softSignIn');
+    const signOutBtn = document.getElementById('signOut');
 
     // Update avatar display based on current user
     function updateAvatarUI() {
-      if (currentUserName) {
+      if (isGoogleAuth && googleUserPicture) {
+        // Google authenticated user with picture
+        avatarBtn.innerHTML = '<img src="' + googleUserPicture + '" alt="Profile">';
+        avatarBtn.classList.add('google-auth');
+        avatarBtn.classList.remove('known');
+
+        let html = '<span class="user-name">' + currentUserName + '<span class="verified-badge">✓</span></span>';
+        if (currentUserEmail) {
+          html += '<span class="user-detail"><span class="user-detail-label">Email:</span>' + currentUserEmail + '</span>';
+        }
+        avatarGreeting.innerHTML = html;
+
+        // Show sign out, hide sign in options
+        googleSignInBtn.style.display = 'none';
+        softSignInBtn.style.display = 'none';
+        signOutBtn.style.display = 'block';
+      } else if (currentUserName) {
+        // Soft login user
         avatarBtn.textContent = currentUserName.charAt(0).toUpperCase();
+        avatarBtn.innerHTML = currentUserName.charAt(0).toUpperCase();
         avatarBtn.classList.add('known');
+        avatarBtn.classList.remove('google-auth');
 
         let html = '<span class="user-name">' + currentUserName + '</span>';
         if (currentUserCompany) {
@@ -802,12 +872,23 @@
           html += '<span class="user-detail"><span class="user-detail-label">Phone:</span>' + currentUserPhone + '</span>';
         }
         avatarGreeting.innerHTML = html;
-        avatarAction.textContent = 'Sign Out';
+
+        // Soft login can upgrade to Google, or sign out
+        googleSignInBtn.style.display = 'flex';
+        softSignInBtn.style.display = 'none';
+        signOutBtn.style.display = 'block';
       } else {
+        // Anonymous user
         avatarBtn.textContent = '?';
+        avatarBtn.innerHTML = '?';
         avatarBtn.classList.remove('known');
+        avatarBtn.classList.remove('google-auth');
         avatarGreeting.textContent = 'Guest';
-        avatarAction.textContent = 'Sign In';
+
+        // Show both sign in options, hide sign out
+        googleSignInBtn.style.display = 'flex';
+        softSignInBtn.style.display = 'block';
+        signOutBtn.style.display = 'none';
       }
     }
 
@@ -824,20 +905,31 @@
       }
     });
 
-    // Handle sign in/out action
-    avatarAction.addEventListener('click', () => {
+    // Handle Google sign in
+    googleSignInBtn.addEventListener('click', () => {
       avatarDropdown.classList.remove('active');
+      // Redirect to Google OAuth with current user ID
+      window.location.href = `${API_HOST}/auth/google/login?user_id=${userId}`;
+    });
 
-      if (currentUserName) {
-        // Sign out - forget the user
-        signOut();
-      } else {
-        // Sign in - prompt user to introduce themselves
-        signIn();
-      }
+    // Handle soft sign in (conversational)
+    softSignInBtn.addEventListener('click', () => {
+      avatarDropdown.classList.remove('active');
+      signIn();
+    });
+
+    // Handle sign out
+    signOutBtn.addEventListener('click', () => {
+      avatarDropdown.classList.remove('active');
+      signOut();
     });
 
     function signOut() {
+      // Clear Google auth state
+      localStorage.removeItem('blacksky_auth_token');
+      googleAuthToken = null;
+      googleUserPicture = null;
+      isGoogleAuth = false;
       // Generate new user ID
       userId = generateUUID();
       setCookie('blacksky_user_id', userId, 30);
@@ -958,6 +1050,11 @@
             currentUserEmail = data.email;
             currentUserPhone = data.phone;
             currentUserCompany = data.company;
+            // Check if user is Google authenticated
+            if (data.auth_method === 'google' && data.google_picture) {
+              isGoogleAuth = true;
+              googleUserPicture = data.google_picture;
+            }
             updateAvatarUI();
           }
         }
@@ -965,6 +1062,52 @@
         // Silently fail - user is just anonymous
         console.log('Could not fetch user context');
       }
+    }
+
+    // Verify Google auth token
+    async function verifyGoogleAuth(token) {
+      try {
+        const res = await fetch(`${API_HOST}/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.valid) {
+            // Update user state with Google auth info
+            userId = data.user_id;
+            setCookie('blacksky_user_id', userId, 30);
+            currentUserName = data.name;
+            currentUserEmail = data.email;
+            googleUserPicture = data.picture;
+            isGoogleAuth = true;
+            updateAvatarUI();
+            return true;
+          }
+        }
+      } catch (e) {
+        console.error('Auth verification failed:', e);
+      }
+      // Invalid token - clear it
+      localStorage.removeItem('blacksky_auth_token');
+      googleAuthToken = null;
+      return false;
+    }
+
+    // Check for auth token in URL (OAuth callback redirect)
+    function checkAuthCallback() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      if (token) {
+        // Store token and verify
+        localStorage.setItem('blacksky_auth_token', token);
+        googleAuthToken = token;
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return verifyGoogleAuth(token);
+      }
+      return Promise.resolve(false);
     }
 
     // Cookie utilities
@@ -996,7 +1139,27 @@
     }
 
     // Initialize avatar on page load (must be after userId is set)
-    fetchUserContext();
+    // Check for OAuth callback first, then verify stored token, then fetch context
+    async function initializeAuth() {
+      // Check for token in URL (OAuth callback)
+      const callbackResult = await checkAuthCallback();
+      if (callbackResult) {
+        return; // Already authenticated via callback
+      }
+
+      // Check for stored token
+      if (googleAuthToken) {
+        const verified = await verifyGoogleAuth(googleAuthToken);
+        if (verified) {
+          return; // Token still valid
+        }
+      }
+
+      // No Google auth - check regular user context
+      await fetchUserContext();
+    }
+
+    initializeAuth();
 
     // Start typewriter effect for welcome message
     typeWriter('... hello world ...', 'typewriterText', 80, startFollowUpTimer);

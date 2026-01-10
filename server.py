@@ -1,10 +1,10 @@
 """
 FastAPI server for Blacksky Chatbot (Cloud Version)
 """
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,14 +13,23 @@ import asyncio
 import time
 import json
 import re
+import uuid
+from datetime import datetime, timedelta
+
+from authlib.integrations.starlette_client import OAuth
+from starlette.middleware.sessions import SessionMiddleware
+import jwt
 
 from chatbot import BlackskyChatbot
-from config import HOST, PORT, DOCS_DIR, ADMIN_PASSWORD, ANTHROPIC_MODEL
+from config import (
+    HOST, PORT, DOCS_DIR, ADMIN_PASSWORD, ANTHROPIC_MODEL,
+    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, SESSION_SECRET_KEY
+)
 from database import (
     init_db, get_or_create_user, update_user, save_conversation, update_conversation,
     get_user_context, get_leads, lookup_users_by_name, link_users,
     get_lead_details, update_lead_status, update_lead_notes, get_user_conversations,
-    delete_user, get_analytics
+    delete_user, get_analytics, get_user_by_google_id, create_google_user, link_google_account
 )
 
 # Paths
@@ -104,6 +113,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Session middleware for OAuth
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
+
+# Google OAuth configuration
+oauth = OAuth()
+if GOOGLE_CLIENT_ID:
+    oauth.register(
+        name='google',
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+        client_kwargs={'scope': 'openid email profile'}
+    )
+
+
+# JWT token utilities
+def create_auth_token(user_id: str, google_id: str) -> str:
+    """Create JWT token for authenticated session."""
+    payload = {
+        'user_id': user_id,
+        'google_id': google_id,
+        'exp': datetime.utcnow() + timedelta(days=30),
+        'iat': datetime.utcnow()
+    }
+    return jwt.encode(payload, SESSION_SECRET_KEY, algorithm='HS256')
+
+
+def decode_auth_token(token: str) -> Optional[dict]:
+    """Decode and verify JWT token."""
+    try:
+        payload = jwt.decode(token, SESSION_SECRET_KEY, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
 
 class ChatRequest(BaseModel):
@@ -400,7 +446,9 @@ async def get_user_context_endpoint(user_id: str):
         "phone": context.get("phone"),
         "company": context.get("company"),
         "is_returning": context.get("is_returning", False),
-        "conversation_count": context.get("conversation_count", 0)
+        "conversation_count": context.get("conversation_count", 0),
+        "auth_method": context.get("auth_method"),
+        "google_picture": context.get("google_picture")
     }
 
 
@@ -898,6 +946,124 @@ async def clear_all_data(password: str = Query(...)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         session.close()
+
+
+# ============================================================
+# Google OAuth Endpoints
+# ============================================================
+
+@app.get("/auth/google/login")
+async def google_login(request: Request, user_id: Optional[str] = None):
+    """Initiate Google OAuth flow."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google OAuth not configured")
+
+    # Store current user_id in session for potential account linking
+    if user_id:
+        request.session['pending_link_user_id'] = user_id
+
+    return await oauth.google.authorize_redirect(request, GOOGLE_REDIRECT_URI)
+
+
+@app.get("/auth/google/callback")
+async def google_callback(request: Request):
+    """Handle Google OAuth callback."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google OAuth not configured")
+
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        user_info = token.get('userinfo')
+
+        if not user_info:
+            raise HTTPException(status_code=400, detail="Failed to get user info from Google")
+
+        google_id = user_info['sub']
+        google_email = user_info.get('email', '')
+        google_name = user_info.get('name', '')
+        google_picture = user_info.get('picture', '')
+
+        # Check if user already exists with this Google ID
+        existing_user = get_user_by_google_id(google_id)
+
+        if existing_user:
+            # Returning Google user
+            user_id = existing_user['id']
+        else:
+            # Check if there's a pending soft-login user to link
+            pending_user_id = request.session.pop('pending_link_user_id', None)
+
+            if pending_user_id:
+                # Link Google account to existing soft-login user
+                result = link_google_account(
+                    user_id=pending_user_id,
+                    google_id=google_id,
+                    google_email=google_email,
+                    google_name=google_name,
+                    google_picture=google_picture
+                )
+                user_id = pending_user_id if result else str(uuid.uuid4())
+            else:
+                # Create new user with Google auth
+                user_id = str(uuid.uuid4())
+                create_google_user(
+                    user_id=user_id,
+                    google_id=google_id,
+                    google_email=google_email,
+                    google_name=google_name,
+                    google_picture=google_picture
+                )
+
+        # Create auth token
+        auth_token = create_auth_token(user_id, google_id)
+
+        # Redirect back to demo page with token
+        return RedirectResponse(
+            url=f"/demo?auth_token={auth_token}",
+            status_code=302
+        )
+    except Exception as e:
+        print(f"Google OAuth error: {e}")
+        return RedirectResponse(
+            url="/demo?auth_error=failed",
+            status_code=302
+        )
+
+
+class AuthTokenRequest(BaseModel):
+    token: str
+
+
+@app.post("/auth/verify")
+async def verify_auth_token(request: AuthTokenRequest):
+    """Verify auth token and return user info."""
+    payload = decode_auth_token(request.token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = payload.get('user_id')
+    google_id = payload.get('google_id')
+
+    # Get full user info
+    user = get_user_by_google_id(google_id)
+    if user:
+        return {
+            "user_id": user['id'],
+            "name": user['name'],
+            "email": user['email'],
+            "google_picture": user['google_picture'],
+            "auth_method": user['auth_method']
+        }
+
+    raise HTTPException(status_code=404, detail="User not found")
+
+
+@app.post("/auth/logout")
+async def logout(request: Request):
+    """Log out user (clear session)."""
+    request.session.clear()
+    return {"status": "logged_out"}
 
 
 def calculate_lead_score(messages: list) -> int:
