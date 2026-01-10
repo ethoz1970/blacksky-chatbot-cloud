@@ -6,7 +6,7 @@ import os
 import json
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey, JSON, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -43,9 +43,9 @@ class Conversation(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(36), ForeignKey("users.id"))
     summary = Column(Text, nullable=True)
-    interests = Column(Text, nullable=True)  # JSON array as string
+    interests = Column(JSON, nullable=True)  # JSON array stored as JSONB in PostgreSQL
     lead_score = Column(Integer, default=1)
-    messages = Column(Text, nullable=True)  # JSON as string
+    messages = Column(JSON, nullable=True)  # JSON stored as JSONB in PostgreSQL
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="conversations")
@@ -65,6 +65,43 @@ def init_db():
 
         # Create tables if they don't exist
         Base.metadata.create_all(bind=engine)
+
+        # Migrate TEXT columns to JSONB if needed (one-time migration)
+        with engine.connect() as conn:
+            try:
+                # Check if interests column is TEXT type and convert to JSONB
+                conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        -- Convert interests from TEXT to JSONB
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'conversations' AND column_name = 'interests'
+                            AND data_type = 'text'
+                        ) THEN
+                            ALTER TABLE conversations
+                            ALTER COLUMN interests TYPE JSONB
+                            USING CASE WHEN interests IS NULL THEN NULL ELSE interests::jsonb END;
+                            RAISE NOTICE 'Migrated interests column to JSONB';
+                        END IF;
+
+                        -- Convert messages from TEXT to JSONB
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'conversations' AND column_name = 'messages'
+                            AND data_type = 'text'
+                        ) THEN
+                            ALTER TABLE conversations
+                            ALTER COLUMN messages TYPE JSONB
+                            USING CASE WHEN messages IS NULL THEN NULL ELSE messages::jsonb END;
+                            RAISE NOTICE 'Migrated messages column to JSONB';
+                        END IF;
+                    END $$;
+                """))
+                conn.commit()
+            except Exception as e:
+                print(f"Migration check: {e}")
+
         print("PostgreSQL database connected")
         return True
     except Exception as e:
@@ -167,15 +204,12 @@ def save_conversation(user_id: str, messages: list, summary: str = None,
         return None
 
     try:
-        # Convert lists to JSON strings
-        interests_json = json.dumps(interests) if interests else None
-        messages_json = json.dumps(messages) if messages else None
-
+        # JSON column type handles serialization automatically
         conversation = Conversation(
             user_id=user_id,
-            messages=messages_json,
+            messages=messages,
             summary=summary,
-            interests=interests_json,
+            interests=interests,
             lead_score=lead_score
         )
         session.add(conversation)
@@ -205,13 +239,13 @@ def update_conversation(conversation_id: int, messages: list, summary: str = Non
         if conversation is None:
             return False
 
-        # Update fields
+        # Update fields - JSON column type handles serialization automatically
         if messages is not None:
-            conversation.messages = json.dumps(messages)
+            conversation.messages = messages
         if summary is not None:
             conversation.summary = summary
         if interests is not None:
-            conversation.interests = json.dumps(interests)
+            conversation.interests = interests
         if lead_score is not None:
             conversation.lead_score = lead_score
 
@@ -245,13 +279,8 @@ def get_user_context(user_id: str) -> Optional[dict]:
             .first()
         )
 
-        # Parse JSON strings back to lists
-        last_interests = None
-        if last_conversation and last_conversation.interests:
-            try:
-                last_interests = json.loads(last_conversation.interests)
-            except:
-                last_interests = None
+        # JSON column type returns Python objects directly
+        last_interests = last_conversation.interests if last_conversation else None
 
         context = {
             "user_id": user.id,
@@ -298,13 +327,8 @@ def get_leads(limit: int = 50) -> list:
                 .first()
             )
 
-            # Parse interests JSON
-            interests = []
-            if best_conv and best_conv.interests:
-                try:
-                    interests = json.loads(best_conv.interests)
-                except:
-                    interests = []
+            # JSON column type returns Python objects directly
+            interests = best_conv.interests if best_conv and best_conv.interests else []
 
             leads.append({
                 "id": user.id,
@@ -358,13 +382,8 @@ def lookup_users_by_name(name: str) -> list:
                 .first()
             )
 
-            # Parse interests JSON
-            last_interests = []
-            if last_conv and last_conv.interests:
-                try:
-                    last_interests = json.loads(last_conv.interests)
-                except:
-                    last_interests = []
+            # JSON column type returns Python objects directly
+            last_interests = last_conv.interests if last_conv and last_conv.interests else []
 
             results.append({
                 "user_id": user.id,
@@ -440,20 +459,9 @@ def get_user_conversations(user_id: str) -> list:
 
         results = []
         for conv in conversations:
-            # Parse JSON strings
-            messages = []
-            if conv.messages:
-                try:
-                    messages = json.loads(conv.messages)
-                except:
-                    messages = []
-
-            interests = []
-            if conv.interests:
-                try:
-                    interests = json.loads(conv.interests)
-                except:
-                    interests = []
+            # JSON column type returns Python objects directly
+            messages = conv.messages if conv.messages else []
+            interests = conv.interests if conv.interests else []
 
             results.append({
                 "id": conv.id,
