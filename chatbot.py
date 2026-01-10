@@ -1,14 +1,12 @@
 """
-Core chatbot logic using Together AI
+Core chatbot logic using Anthropic Claude
 """
-from together import Together
+from anthropic import Anthropic
 
 from config import (
-    TOGETHER_API_KEY,
-    TOGETHER_MODEL,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
     MAX_TOKENS,
-    TEMPERATURE,
-    TOP_P,
     MAX_HISTORY_TURNS
 )
 from prompts import SYSTEM_PROMPT
@@ -16,21 +14,21 @@ from rag import DocumentStore
 
 
 class BlackskyChatbot:
-    """Chatbot wrapper using Together AI for inference."""
-    
+    """Chatbot wrapper using Anthropic Claude for inference."""
+
     def __init__(self, use_rag: bool = True):
         self.client = None
         self.conversation_history = []
         self.use_rag = use_rag
         self.doc_store = None
-        
+
     def initialize(self):
-        """Initialize Together AI client and RAG."""
+        """Initialize Anthropic client and RAG."""
         print("Initializing Blacksky Chatbot (Cloud)...")
-        
-        # Initialize Together AI client
-        self.client = Together(api_key=TOGETHER_API_KEY)
-        print("✓ Together AI client ready")
+
+        # Initialize Anthropic client
+        self.client = Anthropic(api_key=ANTHROPIC_API_KEY)
+        print("✓ Anthropic Claude client ready")
         
         # Initialize RAG if enabled
         if self.use_rag:
@@ -90,8 +88,8 @@ class BlackskyChatbot:
         if context_prompt:
             system_content += context_prompt
 
-        # Build messages array
-        messages = [{"role": "system", "content": system_content}]
+        # Build messages array (Anthropic format - no system message in array)
+        messages = []
 
         # Add conversation history
         for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
@@ -101,16 +99,15 @@ class BlackskyChatbot:
         # Add current user message
         messages.append({"role": "user", "content": user_message})
 
-        # Call Together AI
-        response = self.client.chat.completions.create(
-            model=TOGETHER_MODEL,
-            messages=messages,
+        # Call Anthropic Claude
+        response = self.client.messages.create(
+            model=ANTHROPIC_MODEL,
             max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-            top_p=TOP_P,
+            system=system_content,
+            messages=messages
         )
 
-        assistant_message = response.choices[0].message.content.strip()
+        assistant_message = response.content[0].text.strip()
 
         # Store in history
         self.conversation_history.append({
@@ -142,8 +139,8 @@ class BlackskyChatbot:
         if context_prompt:
             system_content += context_prompt
 
-        # Build messages array
-        messages = [{"role": "system", "content": system_content}]
+        # Build messages array (Anthropic format - no system message in array)
+        messages = []
 
         # Add conversation history
         for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
@@ -153,22 +150,17 @@ class BlackskyChatbot:
         # Add current user message
         messages.append({"role": "user", "content": user_message})
 
-        # Call Together AI with streaming
+        # Call Anthropic Claude with streaming
         full_response = ""
-        stream = self.client.chat.completions.create(
-            model=TOGETHER_MODEL,
-            messages=messages,
+        with self.client.messages.stream(
+            model=ANTHROPIC_MODEL,
             max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-            top_p=TOP_P,
-            stream=True
-        )
-
-        for chunk in stream:
-            if chunk.choices[0].delta.content:
-                token = chunk.choices[0].delta.content
-                full_response += token
-                yield token
+            system=system_content,
+            messages=messages
+        ) as stream:
+            for text in stream.text_stream:
+                full_response += text
+                yield text
 
         # Store in history after streaming completes
         self.conversation_history.append({
@@ -186,7 +178,7 @@ class BlackskyChatbot:
         stats = {
             "history_turns": len(self.conversation_history),
             "max_history": MAX_HISTORY_TURNS,
-            "model": TOGETHER_MODEL,
+            "model": ANTHROPIC_MODEL,
             "rag_enabled": self.use_rag
         }
         if self.use_rag and self.doc_store:

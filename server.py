@@ -15,7 +15,7 @@ import json
 import re
 
 from chatbot import BlackskyChatbot
-from config import HOST, PORT, DOCS_DIR, ADMIN_PASSWORD
+from config import HOST, PORT, DOCS_DIR, ADMIN_PASSWORD, ANTHROPIC_MODEL
 from database import (
     init_db, get_or_create_user, update_user, save_conversation, update_conversation,
     get_user_context, get_leads, lookup_users_by_name, link_users,
@@ -906,14 +906,13 @@ def generate_summary(messages: list) -> str:
 
         prompt = f"Summarize this conversation in one sentence, focusing on what the user was interested in:\n\n{conversation_text}"
 
-        response = bot.client.chat.completions.create(
-            model="meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-            messages=[{"role": "user", "content": prompt}],
+        response = bot.client.messages.create(
+            model=ANTHROPIC_MODEL,
             max_tokens=60,
-            temperature=0.3
+            messages=[{"role": "user", "content": prompt}]
         )
 
-        return response.choices[0].message.content.strip()
+        return response.content[0].text.strip()
     except Exception as e:
         print(f"Summary generation failed: {e}")
         return None
