@@ -66,39 +66,40 @@ def init_db():
         # Create tables if they don't exist
         Base.metadata.create_all(bind=engine)
 
-        # Migrate TEXT columns to JSONB if needed (one-time migration)
+        # Migrate columns to JSONB if needed (one-time migration)
         with engine.connect() as conn:
             try:
-                # Check if interests column is TEXT type and convert to JSONB
+                # Convert interests and messages columns to JSONB from any type
                 conn.execute(text("""
                     DO $$
                     BEGIN
-                        -- Convert interests from TEXT to JSONB
+                        -- Convert interests to JSONB if not already
                         IF EXISTS (
                             SELECT 1 FROM information_schema.columns
                             WHERE table_name = 'conversations' AND column_name = 'interests'
-                            AND data_type = 'text'
+                            AND data_type != 'jsonb'
                         ) THEN
-                            ALTER TABLE conversations
-                            ALTER COLUMN interests TYPE JSONB
-                            USING CASE WHEN interests IS NULL THEN NULL ELSE interests::jsonb END;
-                            RAISE NOTICE 'Migrated interests column to JSONB';
+                            -- Drop and recreate the column as JSONB
+                            ALTER TABLE conversations DROP COLUMN IF EXISTS interests;
+                            ALTER TABLE conversations ADD COLUMN interests JSONB;
+                            RAISE NOTICE 'Recreated interests column as JSONB';
                         END IF;
 
-                        -- Convert messages from TEXT to JSONB
+                        -- Convert messages to JSONB if not already
                         IF EXISTS (
                             SELECT 1 FROM information_schema.columns
                             WHERE table_name = 'conversations' AND column_name = 'messages'
-                            AND data_type = 'text'
+                            AND data_type != 'jsonb'
                         ) THEN
-                            ALTER TABLE conversations
-                            ALTER COLUMN messages TYPE JSONB
-                            USING CASE WHEN messages IS NULL THEN NULL ELSE messages::jsonb END;
-                            RAISE NOTICE 'Migrated messages column to JSONB';
+                            -- Drop and recreate the column as JSONB
+                            ALTER TABLE conversations DROP COLUMN IF EXISTS messages;
+                            ALTER TABLE conversations ADD COLUMN messages JSONB;
+                            RAISE NOTICE 'Recreated messages column as JSONB';
                         END IF;
                     END $$;
                 """))
                 conn.commit()
+                print("Database migrations complete.")
             except Exception as e:
                 print(f"Migration check: {e}")
 
