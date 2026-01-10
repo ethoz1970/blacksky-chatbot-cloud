@@ -935,7 +935,18 @@ def extract_user_name(messages: list) -> str:
     """
     import re
 
-    # Only match explicit name patterns - removed standalone capitalized word pattern
+    # Common words that follow "I'm" but aren't names
+    not_names = {
+        'not', 'just', 'very', 'so', 'really', 'quite', 'pretty', 'too',
+        'looking', 'interested', 'curious', 'wondering', 'trying', 'hoping',
+        'here', 'back', 'new', 'happy', 'glad', 'sorry', 'sure', 'fine',
+        'good', 'great', 'okay', 'ok', 'well', 'busy', 'free', 'available',
+        'calling', 'writing', 'reaching', 'contacting', 'asking', 'inquiring',
+        'a', 'an', 'the', 'your', 'their', 'his', 'her', 'our', 'my',
+        'working', 'using', 'building', 'developing', 'creating', 'running'
+    }
+
+    # Only match explicit name patterns
     name_patterns = [
         r"(?:my name is|i'm|i am|call me|this is)\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})",
     ]
@@ -954,6 +965,11 @@ def extract_user_name(messages: list) -> str:
             if match:
                 name_part = match.group(1).strip()
                 words = name_part.split()
+
+                # Check if first word is a common non-name
+                if words and words[0].lower() in not_names:
+                    continue
+
                 clean_words = []
                 for word in words:
                     if word.lower() in stop_words:
@@ -990,8 +1006,15 @@ def extract_user_company(messages: list) -> str:
     """Extract user's company from conversation if they provided it."""
     import re
 
+    # Words that aren't company names
+    not_companies = {
+        'a', 'an', 'the', 'here', 'there', 'home', 'work', 'school',
+        'looking', 'interested', 'curious', 'wondering', 'asking',
+        'legacy', 'new', 'old', 'small', 'large', 'big', 'local'
+    }
+
     company_patterns = [
-        r"(?:i work (?:at|for)|i'm (?:at|with|from)|my company is|company is|from)\s+([A-Za-z0-9][\w\s&.,'-]*?)(?:\s*[,.]|\s+and\s|\s+my\s|\s+email|$)",
+        r"(?:i work (?:at|for)|i'm (?:at|with|from)|my company is)\s+([A-Za-z0-9][\w\s&.,'-]*?)(?:\s*[,.]|\s+and\s|\s+my\s|\s+email|$)",
         r"company[:\s]+([A-Za-z0-9][\w\s&.,'-]+?)(?:\s*[,.]|\s+and\s|\s+my\s|$)",
     ]
 
@@ -1005,7 +1028,17 @@ def extract_user_company(messages: list) -> str:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 company = match.group(1).strip().rstrip('.,')
-                if 2 <= len(company) <= 100:
+                words = company.split()
+
+                # Skip if first word is a common non-company word
+                if words and words[0].lower() in not_companies:
+                    continue
+
+                # Limit to max 4 words for a company name
+                if len(words) > 4:
+                    continue
+
+                if 2 <= len(company) <= 50:
                     return company.title()
 
     return None
