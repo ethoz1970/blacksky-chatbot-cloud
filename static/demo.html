@@ -1098,7 +1098,15 @@
     // Check for auth token in URL (OAuth callback redirect)
     function checkAuthCallback() {
       const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get('token');
+      const token = urlParams.get('auth_token');
+      const authError = urlParams.get('auth_error');
+
+      if (authError) {
+        console.error('Google auth failed:', authError);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return Promise.resolve(false);
+      }
+
       if (token) {
         // Store token and verify
         localStorage.setItem('blacksky_auth_token', token);
