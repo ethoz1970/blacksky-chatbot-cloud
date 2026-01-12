@@ -29,7 +29,8 @@ from database import (
     init_db, get_or_create_user, update_user, save_conversation, update_conversation,
     get_user_context, get_leads, lookup_users_by_name, link_users,
     get_lead_details, update_lead_status, update_lead_notes, get_user_conversations,
-    delete_user, get_analytics, get_user_by_google_id, create_google_user, link_google_account
+    delete_user, get_analytics, get_user_by_google_id, create_google_user, link_google_account,
+    get_user_dashboard
 )
 
 # Paths
@@ -475,6 +476,15 @@ async def get_user_context_endpoint(user_id: str):
         "auth_method": context.get("auth_method"),
         "google_picture": context.get("google_picture")
     }
+
+
+@app.get("/user/{user_id}/dashboard")
+async def get_user_dashboard_endpoint(user_id: str):
+    """Get comprehensive dashboard data for user."""
+    dashboard = get_user_dashboard(user_id)
+    if dashboard is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return dashboard
 
 
 @app.post("/user/lookup")

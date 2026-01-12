@@ -664,6 +664,228 @@
       margin-left: 4px;
     }
 
+    /* Dashboard Panel Styles */
+    .dashboard-profile {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #333;
+      margin-bottom: 20px;
+    }
+
+    .dashboard-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #2a4a2a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      color: #6f6;
+      flex-shrink: 0;
+    }
+
+    .dashboard-avatar img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .dashboard-avatar.google-auth {
+      background: #2a3a4a;
+      border: 2px solid #4285f4;
+    }
+
+    .dashboard-info {
+      flex: 1;
+    }
+
+    .dashboard-name {
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dashboard-detail {
+      color: #888;
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+
+    .dashboard-edit-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #888;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+      margin-top: 8px;
+    }
+
+    .dashboard-edit-btn:hover {
+      border-color: #6f6;
+      color: #6f6;
+    }
+
+    .dashboard-stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .dashboard-stat {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .dashboard-stat-value {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #6f6;
+      margin-bottom: 4px;
+    }
+
+    .dashboard-stat-label {
+      font-size: 0.7rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .dashboard-section-title {
+      color: #888;
+      border-bottom: 1px solid #333;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      margin-top: 24px;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .dashboard-conversation {
+      padding: 12px 0;
+      border-bottom: 1px solid #222;
+    }
+
+    .dashboard-conversation:last-child {
+      border-bottom: none;
+    }
+
+    .dashboard-conversation-date {
+      color: #666;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+
+    .dashboard-conversation-summary {
+      color: #ccc;
+      font-size: 0.9rem;
+    }
+
+    .dashboard-interests {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .dashboard-interest-tag {
+      background: #1a2a1a;
+      border: 1px solid #2a4a2a;
+      color: #6f6;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+
+    .dashboard-empty {
+      color: #555;
+      font-style: italic;
+      padding: 12px 0;
+    }
+
+    /* Edit Form Styles */
+    .dashboard-edit-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .dashboard-form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .dashboard-form-group label {
+      color: #888;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .dashboard-form-group input {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #e0e0e0;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .dashboard-form-group input:focus {
+      outline: none;
+      border-color: #6f6;
+    }
+
+    .dashboard-form-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .dashboard-btn-save {
+      background: #2a4a2a;
+      border: none;
+      color: #6f6;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      flex: 1;
+    }
+
+    .dashboard-btn-save:hover {
+      background: #3a5a3a;
+    }
+
+    .dashboard-btn-cancel {
+      background: transparent;
+      border: 1px solid #444;
+      color: #888;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .dashboard-btn-cancel:hover {
+      border-color: #666;
+      color: #aaa;
+    }
+
     @keyframes blink {
       0%, 50% { opacity: 1; }
       51%, 100% { opacity: 0; }
@@ -689,6 +911,7 @@
           Sign in with Google
         </div>
         <div class="avatar-dropdown-item" id="softSignIn">Sign In</div>
+        <div class="avatar-dropdown-item" id="dashboardBtn" style="display: none;">My Dashboard</div>
         <div class="avatar-dropdown-item" id="signOut" style="display: none;">Sign Out</div>
       </div>
     </div>
@@ -834,6 +1057,7 @@
     const avatarGreeting = document.getElementById('avatarGreeting');
     const googleSignInBtn = document.getElementById('googleSignIn');
     const softSignInBtn = document.getElementById('softSignIn');
+    const dashboardBtn = document.getElementById('dashboardBtn');
     const signOutBtn = document.getElementById('signOut');
 
     // Update avatar display based on current user
@@ -850,9 +1074,10 @@
         }
         avatarGreeting.innerHTML = html;
 
-        // Show sign out, hide sign in options
+        // Show sign out and dashboard, hide sign in options
         googleSignInBtn.style.display = 'none';
         softSignInBtn.style.display = 'none';
+        dashboardBtn.style.display = 'block';
         signOutBtn.style.display = 'block';
       } else if (currentUserName) {
         // Soft login user
@@ -873,9 +1098,10 @@
         }
         avatarGreeting.innerHTML = html;
 
-        // Soft login can upgrade to Google, or sign out
+        // Soft login can upgrade to Google, view dashboard, or sign out
         googleSignInBtn.style.display = 'flex';
         softSignInBtn.style.display = 'none';
+        dashboardBtn.style.display = 'block';
         signOutBtn.style.display = 'block';
       } else {
         // Anonymous user
@@ -885,9 +1111,10 @@
         avatarBtn.classList.remove('google-auth');
         avatarGreeting.textContent = 'Guest';
 
-        // Show both sign in options, hide sign out
+        // Show both sign in options, hide dashboard and sign out
         googleSignInBtn.style.display = 'flex';
         softSignInBtn.style.display = 'block';
+        dashboardBtn.style.display = 'none';
         signOutBtn.style.display = 'none';
       }
     }
@@ -923,6 +1150,260 @@
       avatarDropdown.classList.remove('active');
       signOut();
     });
+
+    // Handle dashboard button
+    dashboardBtn.addEventListener('click', () => {
+      avatarDropdown.classList.remove('active');
+      openDashboard();
+    });
+
+    // Dashboard state
+    let dashboardData = null;
+    let isEditingProfile = false;
+
+    // Fetch dashboard data
+    async function fetchDashboardData() {
+      try {
+        const res = await fetch(`${API_HOST}/user/${userId}/dashboard`);
+        if (res.ok) {
+          dashboardData = await res.json();
+          return dashboardData;
+        }
+      } catch (e) {
+        console.error('Error fetching dashboard:', e);
+      }
+      return null;
+    }
+
+    // Format date for display
+    function formatDashboardDate(isoDate) {
+      if (!isoDate) return '-';
+      const date = new Date(isoDate);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // Format relative time
+    function formatRelativeTime(isoDate) {
+      if (!isoDate) return '-';
+      const date = new Date(isoDate);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return formatDashboardDate(isoDate);
+    }
+
+    // Build dashboard content HTML
+    function buildDashboardContent(data) {
+      const profile = data.profile;
+      const activity = data.activity;
+      const conversations = data.conversations || [];
+      const interests = data.interests || [];
+
+      // Avatar
+      let avatarHtml;
+      if (profile.google_picture) {
+        avatarHtml = `<div class="dashboard-avatar google-auth"><img src="${profile.google_picture}" alt="Profile"></div>`;
+      } else if (profile.name) {
+        avatarHtml = `<div class="dashboard-avatar">${profile.name.charAt(0).toUpperCase()}</div>`;
+      } else {
+        avatarHtml = `<div class="dashboard-avatar">?</div>`;
+      }
+
+      // Name with verified badge
+      let nameHtml = profile.name || 'Anonymous';
+      if (profile.auth_method === 'google') {
+        nameHtml += '<span class="verified-badge">✓</span>';
+      }
+
+      // Profile details
+      let detailsHtml = '';
+      if (profile.email) detailsHtml += `<div class="dashboard-detail">${profile.email}</div>`;
+      if (profile.company) detailsHtml += `<div class="dashboard-detail">${profile.company}</div>`;
+      if (profile.phone) detailsHtml += `<div class="dashboard-detail">${profile.phone}</div>`;
+
+      // Activity stats
+      const memberSince = formatDashboardDate(activity.member_since);
+      const lastActive = formatRelativeTime(activity.last_active);
+
+      // Conversation history
+      let conversationsHtml = '';
+      if (conversations.length === 0) {
+        conversationsHtml = '<div class="dashboard-empty">No conversations yet</div>';
+      } else {
+        conversations.slice(0, 10).forEach(conv => {
+          const date = formatDashboardDate(conv.date);
+          const summary = conv.summary || 'No summary';
+          conversationsHtml += `
+            <div class="dashboard-conversation">
+              <div class="dashboard-conversation-date">${date}</div>
+              <div class="dashboard-conversation-summary">${summary}</div>
+            </div>
+          `;
+        });
+      }
+
+      // Interests
+      let interestsHtml = '';
+      if (interests.length === 0) {
+        interestsHtml = '<div class="dashboard-empty">No interests tracked yet</div>';
+      } else {
+        interests.forEach(interest => {
+          interestsHtml += `<span class="dashboard-interest-tag">${interest}</span>`;
+        });
+      }
+
+      return `
+        <div class="dashboard-profile">
+          ${avatarHtml}
+          <div class="dashboard-info">
+            <div class="dashboard-name">${nameHtml}</div>
+            ${detailsHtml || '<div class="dashboard-detail" style="color:#555">No details yet</div>'}
+            <button class="dashboard-edit-btn" onclick="showEditProfile()">Edit Profile</button>
+          </div>
+        </div>
+
+        <div class="dashboard-stats">
+          <div class="dashboard-stat">
+            <div class="dashboard-stat-value">${activity.conversation_count}</div>
+            <div class="dashboard-stat-label">Conversations</div>
+          </div>
+          <div class="dashboard-stat">
+            <div class="dashboard-stat-value">${memberSince}</div>
+            <div class="dashboard-stat-label">Joined</div>
+          </div>
+          <div class="dashboard-stat">
+            <div class="dashboard-stat-value">${lastActive}</div>
+            <div class="dashboard-stat-label">Last Active</div>
+          </div>
+        </div>
+
+        <div class="dashboard-section-title">Conversation History</div>
+        ${conversationsHtml}
+
+        <div class="dashboard-section-title">Interests</div>
+        <div class="dashboard-interests">
+          ${interestsHtml}
+        </div>
+      `;
+    }
+
+    // Build edit form HTML
+    function buildEditFormContent(data) {
+      const profile = data.profile;
+      return `
+        <div class="dashboard-edit-form">
+          <div class="dashboard-form-group">
+            <label>Name</label>
+            <input type="text" id="editName" value="${profile.name || ''}" placeholder="Your name">
+          </div>
+          <div class="dashboard-form-group">
+            <label>Email</label>
+            <input type="email" id="editEmail" value="${profile.email || ''}" placeholder="your@email.com">
+          </div>
+          <div class="dashboard-form-group">
+            <label>Phone</label>
+            <input type="tel" id="editPhone" value="${profile.phone || ''}" placeholder="(555) 123-4567">
+          </div>
+          <div class="dashboard-form-group">
+            <label>Company</label>
+            <input type="text" id="editCompany" value="${profile.company || ''}" placeholder="Your company">
+          </div>
+          <div class="dashboard-form-actions">
+            <button class="dashboard-btn-cancel" onclick="cancelEditProfile()">Cancel</button>
+            <button class="dashboard-btn-save" onclick="saveProfileChanges()">Save Changes</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Open dashboard panel
+    async function openDashboard() {
+      // Show loading state
+      openPanel({
+        title: 'My Dashboard',
+        content: '<div style="color:#666; text-align:center; padding:40px;">Loading...</div>'
+      });
+
+      // Fetch data
+      const data = await fetchDashboardData();
+      if (data) {
+        dashboardData = data;
+        slideoutContent.innerHTML = buildDashboardContent(data);
+      } else {
+        slideoutContent.innerHTML = '<div style="color:#666; text-align:center; padding:40px;">Could not load dashboard</div>';
+      }
+    }
+
+    // Show edit profile form
+    window.showEditProfile = function() {
+      if (dashboardData) {
+        isEditingProfile = true;
+        slideoutTitle.textContent = 'Edit Profile';
+        slideoutContent.innerHTML = buildEditFormContent(dashboardData);
+      }
+    };
+
+    // Cancel edit profile
+    window.cancelEditProfile = function() {
+      if (dashboardData) {
+        isEditingProfile = false;
+        slideoutTitle.textContent = 'My Dashboard';
+        slideoutContent.innerHTML = buildDashboardContent(dashboardData);
+      }
+    };
+
+    // Save profile changes
+    window.saveProfileChanges = async function() {
+      const name = document.getElementById('editName').value.trim();
+      const email = document.getElementById('editEmail').value.trim();
+      const phone = document.getElementById('editPhone').value.trim();
+      const company = document.getElementById('editCompany').value.trim();
+
+      try {
+        const res = await fetch(`${API_HOST}/user/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            name: name || null,
+            email: email || null,
+            phone: phone || null,
+            company: company || null
+          })
+        });
+
+        if (res.ok) {
+          // Update local state
+          currentUserName = name || null;
+          currentUserEmail = email || null;
+          currentUserPhone = phone || null;
+          currentUserCompany = company || null;
+
+          // Update avatar
+          updateAvatarUI();
+
+          // Refresh dashboard data
+          dashboardData = await fetchDashboardData();
+          if (dashboardData) {
+            isEditingProfile = false;
+            slideoutTitle.textContent = 'My Dashboard';
+            slideoutContent.innerHTML = buildDashboardContent(dashboardData);
+          }
+        } else {
+          alert('Failed to save changes');
+        }
+      } catch (e) {
+        console.error('Error saving profile:', e);
+        alert('Error saving changes');
+      }
+    };
 
     function signOut() {
       // Clear Google auth state

@@ -756,3 +756,66 @@ def get_analytics() -> dict:
         return {}
     finally:
         session.close()
+
+
+def get_user_dashboard(user_id: str) -> Optional[dict]:
+    """Get comprehensive dashboard data for a user."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if user is None:
+            return None
+
+        # Get all conversations for this user
+        conversations = (
+            session.query(Conversation)
+            .filter(Conversation.user_id == user_id)
+            .order_by(Conversation.created_at.desc())
+            .all()
+        )
+
+        # Build conversation history
+        conversation_history = []
+        all_interests = set()
+        for conv in conversations:
+            # Collect interests
+            if conv.interests:
+                for interest in conv.interests:
+                    all_interests.add(interest)
+
+            conversation_history.append({
+                "id": conv.id,
+                "date": conv.created_at.isoformat() if conv.created_at else None,
+                "summary": conv.summary,
+                "lead_score": conv.lead_score,
+                "interests": conv.interests or []
+            })
+
+        return {
+            "profile": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "company": user.company,
+                "auth_method": user.auth_method,
+                "google_picture": user.google_picture
+            },
+            "activity": {
+                "conversation_count": len(conversations),
+                "member_since": user.created_at.isoformat() if user.created_at else None,
+                "last_active": user.last_seen.isoformat() if user.last_seen else None
+            },
+            "conversations": conversation_history,
+            "interests": list(all_interests)
+        }
+    except Exception as e:
+        print(f"Error getting user dashboard: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+    finally:
+        session.close()
