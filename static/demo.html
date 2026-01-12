@@ -2227,7 +2227,7 @@
       const div = document.createElement('div');
       div.className = `message ${sender}`;
       
-      const label = sender === 'bot' ? 'Blacksky' : 'You';
+      const label = sender === 'bot' ? 'Blacksky' : (currentUserName || 'You');
       const content = sender === 'bot' 
         ? formatMessage(text) 
         : text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
