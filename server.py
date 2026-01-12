@@ -1049,10 +1049,11 @@ async def verify_auth_token(request: AuthTokenRequest):
     user = get_user_by_google_id(google_id)
     if user:
         return {
+            "valid": True,
             "user_id": user['id'],
             "name": user['name'],
             "email": user['email'],
-            "google_picture": user['google_picture'],
+            "picture": user['google_picture'],
             "auth_method": user['auth_method']
         }
 
