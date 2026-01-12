@@ -65,6 +65,31 @@ def run_migrations():
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
         """))
 
+        # Google OAuth columns
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)
+        """))
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email VARCHAR(255)
+        """))
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS google_name VARCHAR(255)
+        """))
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS google_picture VARCHAR(500)
+        """))
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_method VARCHAR(20) DEFAULT 'soft'
+        """))
+
+        # Add unique index on google_id (ignore if exists)
+        try:
+            session.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)
+            """))
+        except Exception:
+            pass  # Index may already exist
+
         session.commit()
         print("Database migrations complete.")
     except Exception as e:
