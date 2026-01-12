@@ -145,7 +145,7 @@ def get_or_create_user(user_id: str) -> Optional[dict]:
             session.commit()
 
         return {
-            "id": user.id,
+            "id": str(user.id),
             "name": user.name,
             "email": user.email,
             "phone": user.phone,
@@ -188,7 +188,7 @@ def update_user(user_id: str, name: str = None, email: str = None, phone: str = 
         session.commit()
 
         return {
-            "id": user.id,
+            "id": str(user.id),
             "name": user.name,
             "email": user.email,
             "phone": user.phone,
@@ -215,7 +215,7 @@ def get_user_by_google_id(google_id: str) -> Optional[dict]:
             return None
 
         return {
-            "id": user.id,
+            "id": str(user.id),
             "name": user.name or user.google_name,
             "email": user.email or user.google_email,
             "phone": user.phone,
@@ -259,7 +259,7 @@ def create_google_user(user_id: str, google_id: str, google_email: str,
         session.refresh(user)
 
         return {
-            "id": user.id,
+            "id": str(user.id),
             "name": user.name,
             "email": user.email,
             "google_id": user.google_id,
@@ -303,7 +303,7 @@ def link_google_account(user_id: str, google_id: str, google_email: str,
         session.commit()
 
         return {
-            "id": user.id,
+            "id": str(user.id),
             "name": user.name,
             "email": user.email,
             "google_id": user.google_id,
@@ -457,7 +457,7 @@ def get_leads(limit: int = 50) -> list:
             interests = best_conv.interests if best_conv and best_conv.interests else []
 
             leads.append({
-                "id": user.id,
+                "id": str(user.id),
                 "name": user.name or "Anonymous",
                 "email": user.email,
                 "company": user.company,
@@ -668,7 +668,7 @@ def get_lead_details(user_id: str) -> Optional[dict]:
         conversations = get_user_conversations(user_id)
 
         return {
-            "id": user.id,
+            "id": str(user.id),
             "name": user.name or "Anonymous",
             "email": user.email,
             "company": user.company,
@@ -796,7 +796,7 @@ def get_user_dashboard(user_id: str) -> Optional[dict]:
 
         return {
             "profile": {
-                "id": user.id,
+                "id": str(user.id),
                 "name": user.name,
                 "email": user.email,
                 "phone": user.phone,
