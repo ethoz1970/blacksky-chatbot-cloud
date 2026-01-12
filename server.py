@@ -507,6 +507,50 @@ async def link_user_sessions(request: UserLinkRequest):
     }
 
 
+@app.get("/admin/debug")
+async def admin_debug(password: str = Query(None)):
+    """Debug endpoint to check database status."""
+    if password != ADMIN_PASSWORD:
+        return {"error": "unauthorized"}
+
+    from database import get_session, User, Conversation
+    session = get_session()
+    if session is None:
+        return {"error": "no database connection"}
+
+    try:
+        # Check if columns exist
+        from sqlalchemy import inspect
+        inspector = inspect(session.bind)
+        columns = [c['name'] for c in inspector.get_columns('users')]
+
+        # Count records
+        user_count = session.query(User).count()
+        conv_count = session.query(Conversation).count()
+
+        # Get sample user
+        sample_user = session.query(User).first()
+        sample_data = None
+        if sample_user:
+            sample_data = {
+                "id": sample_user.id,
+                "name": sample_user.name,
+                "has_google_id": hasattr(sample_user, 'google_id')
+            }
+
+        return {
+            "columns": columns,
+            "user_count": user_count,
+            "conversation_count": conv_count,
+            "sample_user": sample_data
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    finally:
+        session.close()
+
+
 @app.get("/admin")
 async def admin_dashboard(password: str = Query(None)):
     """Admin dashboard for viewing leads."""
