@@ -1102,9 +1102,14 @@ async def google_callback(request: Request):
             status_code=302
         )
     except Exception as e:
-        print(f"Google OAuth error: {e}")
+        import traceback
+        error_msg = str(e)
+        print(f"Google OAuth error: {error_msg}")
+        traceback.print_exc()
+        # Include error details in redirect for debugging
+        from urllib.parse import quote
         return RedirectResponse(
-            url="/demo?auth_error=failed",
+            url=f"/demo?auth_error={quote(error_msg[:100])}",
             status_code=302
         )
 

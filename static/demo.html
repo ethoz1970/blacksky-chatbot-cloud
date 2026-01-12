@@ -1584,6 +1584,7 @@
 
       if (authError) {
         console.error('Google auth failed:', authError);
+        alert('Google sign-in failed: ' + decodeURIComponent(authError));
         window.history.replaceState({}, document.title, window.location.pathname);
         return Promise.resolve(false);
       }
