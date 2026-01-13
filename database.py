@@ -134,8 +134,9 @@ def get_or_create_user(user_id: str) -> Optional[dict]:
         user = session.query(User).filter(User.id == user_id).first()
 
         if user is None:
-            # Create new user
-            user = User(id=user_id)
+            # Create new anonymous user with timestamp
+            timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            user = User(id=user_id, name=f"ANON[{timestamp}]")
             session.add(user)
             session.commit()
             session.refresh(user)
@@ -407,7 +408,7 @@ def get_user_context(user_id: str) -> Optional[dict]:
         last_interests = last_conversation.interests if last_conversation else None
 
         context = {
-            "user_id": user.id,
+            "user_id": str(user.id),
             "name": user.name,
             "email": user.email,
             "phone": user.phone,
@@ -512,7 +513,7 @@ def lookup_users_by_name(name: str) -> list:
             last_interests = last_conv.interests if last_conv and last_conv.interests else []
 
             results.append({
-                "user_id": user.id,
+                "user_id": str(user.id),
                 "name": user.name,
                 "last_topic": last_conv.summary if last_conv else None,
                 "last_interests": last_interests,
