@@ -1,0 +1,145 @@
+/* Slideout Panel styles */
+
+.slideout-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  z-index: 1000;
+}
+
+.slideout-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.slideout-panel {
+  position: fixed;
+  top: 0;
+  right: -500px;
+  width: 100%;
+  max-width: 500px;
+  height: 100%;
+  background: #0a0a0a;
+  border-left: 1px solid #222;
+  transition: right 0.3s ease;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+}
+
+.slideout-panel.active {
+  right: 0;
+}
+
+.slideout-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slideout-title {
+  font-size: 0.6875rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.slideout-close {
+  background: none;
+  border: 1px solid #333;
+  color: #666;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slideout-close:hover {
+  border-color: #e0e0e0;
+  color: #e0e0e0;
+}
+
+.slideout-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 24px;
+}
+
+.slideout-content p {
+  margin-bottom: 16px;
+  line-height: 1.7;
+  font-size: 0.9375rem;
+}
+
+.slideout-content .section-title {
+  color: #888;
+  border-bottom: 1px solid #333;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  margin-top: 24px;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.slideout-content .section-title:first-child {
+  margin-top: 0;
+}
+
+.slideout-image {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid #222;
+  margin-bottom: 24px;
+  opacity: 0.9;
+}
+
+/* Inline links in chat messages */
+.inline-link {
+  color: #888;
+  border-bottom: 1px solid #444;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.inline-link:hover {
+  color: #e0e0e0;
+  border-color: #e0e0e0;
+}
+
+/* Quote blocks */
+.quote-block {
+  border-left: 2px solid #3a3a3a;
+  padding-left: 16px;
+  margin: 12px 0;
+  font-style: italic;
+  color: #aaa;
+}
+
+.quote-source {
+  color: #666;
+  font-size: 0.85em;
+  font-style: normal;
+  margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .slideout-panel {
+    max-width: 100%;
+  }
+}

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Database
+*.db
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Models (large files)
+models/
+
+# ChromaDB
+chroma_db/

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blacksky</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- CSS Files -->
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/menu.css">
+  <link rel="stylesheet" href="/static/css/chat.css">
+  <link rel="stylesheet" href="/static/css/panels.css">
+  <link rel="stylesheet" href="/static/css/avatar.css">
+  <link rel="stylesheet" href="/static/css/modals.css">
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+  <div class="header">
+    <div class="header-title" id="menuToggleTitle">Blacksky</div>
+    <div class="user-avatar">
+      <button class="avatar-btn" id="avatarBtn" title="User menu">?</button>
+      <div class="avatar-dropdown" id="avatarDropdown">
+        <div class="avatar-dropdown-header" id="avatarHeader">
+          <span id="avatarGreeting">Guest</span>
+        </div>
+        <div class="avatar-dropdown-item" id="mediumSignIn">Create Account</div>
+        <div class="avatar-dropdown-item" id="softSignIn">Sign In</div>
+        <div class="avatar-dropdown-item" id="dashboardBtn" style="display:none;">My Dashboard</div>
+        <div class="avatar-dropdown-item" id="signOut" style="display:none;">Sign Out</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Medium Login Modal -->
+  <div class="medium-login-overlay" id="mediumLoginOverlay">
+    <div class="medium-login-modal">
+      <div class="medium-login-header">
+        <h3 id="mediumLoginTitle">Create Account</h3>
+        <button class="medium-login-close" id="mediumLoginClose">&times;</button>
+      </div>
+      <form id="mediumLoginForm">
+        <div class="medium-login-field">
+          <label for="mediumName">Name</label>
+          <input type="text" id="mediumName" name="name" placeholder="Enter your name" required>
+        </div>
+        <div class="medium-login-field">
+          <label for="mediumPassword">Password</label>
+          <input type="password" id="mediumPassword" name="password" placeholder="Enter password" required>
+        </div>
+        <div class="medium-login-field">
+          <label for="mediumInterest">Interest Level (optional)</label>
+          <select id="mediumInterest" name="interest">
+            <option value="">Select interest level...</option>
+            <option value="Gold">Gold</option>
+            <option value="Silver">Silver</option>
+            <option value="Bronze">Bronze</option>
+          </select>
+        </div>
+        <div class="medium-login-error" id="mediumLoginError"></div>
+        <div class="medium-login-buttons">
+          <button type="submit" class="medium-login-submit" id="mediumLoginSubmit">Create Account</button>
+          <button type="button" class="medium-login-alt" id="mediumLoginAlt">Already have an account? Sign In</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Left Menu Panel -->
+  <div class="menu-overlay" id="menuOverlay"></div>
+  <div class="menu-panel" id="menuPanel">
+    <div class="menu-header">
+      <span class="menu-title">Blacksky is ...</span>
+      <button class="menu-close" id="menuClose">×</button>
+    </div>
+    <div class="menu-items">
+      <div class="menu-item" data-panel-key="who">WHO</div>
+      <div class="menu-item" data-panel-key="what">WHAT</div>
+      <div class="menu-item" data-panel-key="why">WHY</div>
+    </div>
+    <div class="menu-footer">Blacksky LLC © 2025</div>
+  </div>
+
+  <div class="chat-container">
+    <div class="messages" id="messages">
+      <div class="message bot" id="welcomeMessage" style="flex:1;display:flex;align-items:center;justify-content:center;">
+        <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
+          <p style="font-size:1.5rem;color:#666;margin:0;"><span id="typewriterText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span></p>
+          <p id="followUpLine" style="font-size:1rem;color:#555;margin:0.5rem 0 0 0;display:none;"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-container">
+    <div class="input-row">
+      <textarea
+        id="input"
+        rows="1"
+        placeholder="> Enter query"
+      ></textarea>
+      <button class="send-button" id="send">Send</button>
+    </div>
+  </div>
+
+  <!-- Slideout Panel -->
+  <div class="slideout-overlay" id="slideoutOverlay"></div>
+  <div class="slideout-panel" id="slideoutPanel">
+    <div class="slideout-header">
+      <span class="slideout-title" id="slideoutTitle">Details</span>
+      <button class="slideout-close" id="slideoutClose">×</button>
+    </div>
+    <div class="slideout-content" id="slideoutContent">
+    </div>
+  </div>
+
+  <!-- JavaScript Files (order matters for dependencies) -->
+  <script src="/static/panels.js"></script>
+  <script src="/static/js/constants.js"></script>
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/state.js"></script>
+  <script src="/static/js/ui.js"></script>
+  <script src="/static/js/chat.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
