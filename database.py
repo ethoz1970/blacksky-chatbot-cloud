@@ -1,17 +1,26 @@
 """
 Database models and functions for Maurice memory system.
-Cloud version using PostgreSQL via Railway.
+Uses PostgreSQL in production (Railway), SQLite for local development.
 """
 import os
 import json
+import bcrypt
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey, JSON, text, Boolean, Index
+from pathlib import Path
+from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-# PostgreSQL database from Railway environment
+# Use DATABASE_URL from environment (Railway PostgreSQL) or fall back to SQLite
 DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    # Railway uses postgres:// but SQLAlchemy needs postgresql://
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+elif not DATABASE_URL:
+    # Local SQLite fallback
+    DATABASE_PATH = Path(__file__).parent / "maurice.db"
+    DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 # SQLAlchemy setup
 Base = declarative_base()
@@ -38,9 +47,14 @@ class User(Base):
     google_email = Column(String(255), nullable=True)
     google_name = Column(String(255), nullable=True)
     google_picture = Column(String(500), nullable=True)
-    auth_method = Column(String(20), default="soft")  # "soft" or "google"
+    auth_method = Column(String(20), default="soft")  # "soft", "medium", or "google"
+
+    # Medium login fields
+    password_hash = Column(String(255), nullable=True)
+    interest_level = Column(String(20), nullable=True)  # Gold, Silver, Bronze
 
     conversations = relationship("Conversation", back_populates="user")
+    facts = relationship("UserFact", back_populates="user", cascade="all, delete-orphan")
 
 
 class Conversation(Base):
@@ -50,67 +64,42 @@ class Conversation(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(36), ForeignKey("users.id"))
     summary = Column(Text, nullable=True)
-    interests = Column(JSON, nullable=True)  # JSON array stored as JSONB in PostgreSQL
+    interests = Column(Text, nullable=True)  # JSON array as string
     lead_score = Column(Integer, default=1)
-    messages = Column(JSON, nullable=True)  # JSON stored as JSONB in PostgreSQL
+    messages = Column(Text, nullable=True)  # JSON as string
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="conversations")
+
+
+class UserFact(Base):
+    """Semantic facts extracted from user conversations."""
+    __tablename__ = "user_facts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    fact_type = Column(String(50), nullable=False, index=True)  # role, budget, pain_point, etc.
+    fact_value = Column(String(500), nullable=False)
+    confidence = Column(Float, default=1.0)  # 0.0-1.0 confidence score
+    source_conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True)
+    source_text = Column(Text, nullable=True)  # The original text that triggered extraction
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="facts")
 
 
 def init_db():
     """Initialize database connection and create tables."""
     global engine, SessionLocal
 
-    if not DATABASE_URL:
-        print("DATABASE_URL not set - database disabled")
-        return False
-
     try:
-        engine = create_engine(DATABASE_URL)
+        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
         # Create tables if they don't exist
         Base.metadata.create_all(bind=engine)
-
-        # Migrate columns to JSONB if needed (one-time migration)
-        with engine.connect() as conn:
-            try:
-                # Convert interests and messages columns to JSONB from any type
-                conn.execute(text("""
-                    DO $$
-                    BEGIN
-                        -- Convert interests to JSONB if not already
-                        IF EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name = 'conversations' AND column_name = 'interests'
-                            AND data_type != 'jsonb'
-                        ) THEN
-                            -- Drop and recreate the column as JSONB
-                            ALTER TABLE conversations DROP COLUMN IF EXISTS interests;
-                            ALTER TABLE conversations ADD COLUMN interests JSONB;
-                            RAISE NOTICE 'Recreated interests column as JSONB';
-                        END IF;
-
-                        -- Convert messages to JSONB if not already
-                        IF EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name = 'conversations' AND column_name = 'messages'
-                            AND data_type != 'jsonb'
-                        ) THEN
-                            -- Drop and recreate the column as JSONB
-                            ALTER TABLE conversations DROP COLUMN IF EXISTS messages;
-                            ALTER TABLE conversations ADD COLUMN messages JSONB;
-                            RAISE NOTICE 'Recreated messages column as JSONB';
-                        END IF;
-                    END $$;
-                """))
-                conn.commit()
-                print("Database migrations complete.")
-            except Exception as e:
-                print(f"Migration check: {e}")
-
-        print("PostgreSQL database connected")
+        print(f"SQLite database ready: {DATABASE_PATH}")
         return True
     except Exception as e:
         print(f"Database connection failed: {e}")
@@ -146,7 +135,7 @@ def get_or_create_user(user_id: str) -> Optional[dict]:
             session.commit()
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name,
             "email": user.email,
             "phone": user.phone,
@@ -189,7 +178,7 @@ def update_user(user_id: str, name: str = None, email: str = None, phone: str = 
         session.commit()
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name,
             "email": user.email,
             "phone": user.phone,
@@ -203,149 +192,31 @@ def update_user(user_id: str, name: str = None, email: str = None, phone: str = 
         session.close()
 
 
-def get_user_by_google_id(google_id: str) -> Optional[dict]:
-    """Find user by Google OAuth ID."""
-    session = get_session()
-    if session is None:
-        return None
-
-    try:
-        user = session.query(User).filter(User.google_id == google_id).first()
-
-        if user is None:
-            return None
-
-        return {
-            "id": str(user.id),
-            "name": user.name or user.google_name,
-            "email": user.email or user.google_email,
-            "phone": user.phone,
-            "company": user.company,
-            "google_id": user.google_id,
-            "google_email": user.google_email,
-            "google_name": user.google_name,
-            "google_picture": user.google_picture,
-            "auth_method": user.auth_method,
-            "status": user.status or "new",
-            "created_at": user.created_at.isoformat() if user.created_at else None,
-            "last_seen": user.last_seen.isoformat() if user.last_seen else None
-        }
-    except Exception as e:
-        print(f"Error getting user by Google ID: {e}")
-        return None
-    finally:
-        session.close()
-
-
-def create_google_user(user_id: str, google_id: str, google_email: str,
-                       google_name: str, google_picture: str) -> Optional[dict]:
-    """Create a new user with Google OAuth."""
-    session = get_session()
-    if session is None:
-        return None
-
-    try:
-        user = User(
-            id=user_id,
-            google_id=google_id,
-            google_email=google_email,
-            google_name=google_name,
-            google_picture=google_picture,
-            name=google_name,
-            email=google_email,
-            auth_method="google"
-        )
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
-        return {
-            "id": str(user.id),
-            "name": user.name,
-            "email": user.email,
-            "google_id": user.google_id,
-            "google_picture": user.google_picture,
-            "auth_method": user.auth_method
-        }
-    except Exception as e:
-        print(f"Error creating Google user: {e}")
-        session.rollback()
-        return None
-    finally:
-        session.close()
-
-
-def link_google_account(user_id: str, google_id: str, google_email: str,
-                        google_name: str, google_picture: str) -> Optional[dict]:
-    """Link Google account to existing user."""
-    session = get_session()
-    if session is None:
-        return None
-
-    try:
-        user = session.query(User).filter(User.id == user_id).first()
-
-        if user is None:
-            return None
-
-        user.google_id = google_id
-        user.google_email = google_email
-        user.google_name = google_name
-        user.google_picture = google_picture
-        user.auth_method = "google"
-
-        # Update name/email if not already set
-        if not user.name:
-            user.name = google_name
-        if not user.email:
-            user.email = google_email
-
-        user.last_seen = datetime.utcnow()
-        session.commit()
-
-        return {
-            "id": str(user.id),
-            "name": user.name,
-            "email": user.email,
-            "google_id": user.google_id,
-            "google_picture": user.google_picture,
-            "auth_method": user.auth_method
-        }
-    except Exception as e:
-        print(f"Error linking Google account: {e}")
-        session.rollback()
-        return None
-    finally:
-        session.close()
-
-
 def save_conversation(user_id: str, messages: list, summary: str = None,
                       interests: list = None, lead_score: int = 1) -> Optional[int]:
     """Save a conversation. Returns conversation ID."""
-    print(f"[DB DEBUG] save_conversation called for user {user_id}")
     session = get_session()
     if session is None:
-        print("[DB DEBUG] Session is None!")
         return None
 
     try:
-        # JSON column type handles serialization automatically
+        # Convert lists to JSON strings for SQLite
+        interests_json = json.dumps(interests) if interests else None
+        messages_json = json.dumps(messages) if messages else None
+
         conversation = Conversation(
             user_id=user_id,
-            messages=messages,
+            messages=messages_json,
             summary=summary,
-            interests=interests,
+            interests=interests_json,
             lead_score=lead_score
         )
         session.add(conversation)
         session.commit()
 
-        print(f"[DB DEBUG] Conversation saved with id {conversation.id}")
         return conversation.id
     except Exception as e:
-        print(f"[DB DEBUG] Error saving conversation: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error saving conversation: {e}")
         session.rollback()
         return None
     finally:
@@ -364,13 +235,13 @@ def update_conversation(conversation_id: int, messages: list, summary: str = Non
         if conversation is None:
             return False
 
-        # Update fields - JSON column type handles serialization automatically
+        # Update fields
         if messages is not None:
-            conversation.messages = messages
+            conversation.messages = json.dumps(messages)
         if summary is not None:
             conversation.summary = summary
         if interests is not None:
-            conversation.interests = interests
+            conversation.interests = json.dumps(interests)
         if lead_score is not None:
             conversation.lead_score = lead_score
 
@@ -404,21 +275,38 @@ def get_user_context(user_id: str) -> Optional[dict]:
             .first()
         )
 
-        # JSON column type returns Python objects directly
-        last_interests = last_conversation.interests if last_conversation else None
+        # Parse JSON strings back to lists
+        last_interests = None
+        if last_conversation and last_conversation.interests:
+            try:
+                last_interests = json.loads(last_conversation.interests)
+            except:
+                last_interests = None
+
+        # Get semantic facts for this user
+        user_facts = session.query(UserFact).filter(
+            UserFact.user_id == user_id,
+            UserFact.confidence >= 0.6
+        ).order_by(UserFact.confidence.desc()).all()
+
+        # Build facts dict (highest confidence for each type)
+        facts_dict = {}
+        for f in user_facts:
+            if f.fact_type not in facts_dict:
+                facts_dict[f.fact_type] = f.fact_value
 
         context = {
-            "user_id": str(user.id),
+            "user_id": user.id,
             "name": user.name,
             "email": user.email,
             "phone": user.phone,
             "company": user.company,
+            "auth_method": user.auth_method or "soft",
             "is_returning": last_conversation is not None,
             "last_summary": last_conversation.summary if last_conversation else None,
             "last_interests": last_interests,
             "conversation_count": session.query(Conversation).filter(Conversation.user_id == user_id).count(),
-            "auth_method": user.auth_method,
-            "google_picture": user.google_picture
+            "facts": facts_dict
         }
 
         return context
@@ -454,11 +342,16 @@ def get_leads(limit: int = 50) -> list:
                 .first()
             )
 
-            # JSON column type returns Python objects directly
-            interests = best_conv.interests if best_conv and best_conv.interests else []
+            # Parse interests JSON
+            interests = []
+            if best_conv and best_conv.interests:
+                try:
+                    interests = json.loads(best_conv.interests)
+                except:
+                    interests = []
 
             leads.append({
-                "id": str(user.id),
+                "id": user.id,
                 "name": user.name or "Anonymous",
                 "email": user.email,
                 "company": user.company,
@@ -509,11 +402,16 @@ def lookup_users_by_name(name: str) -> list:
                 .first()
             )
 
-            # JSON column type returns Python objects directly
-            last_interests = last_conv.interests if last_conv and last_conv.interests else []
+            # Parse interests JSON
+            last_interests = []
+            if last_conv and last_conv.interests:
+                try:
+                    last_interests = json.loads(last_conv.interests)
+                except:
+                    last_interests = []
 
             results.append({
-                "user_id": str(user.id),
+                "user_id": user.id,
                 "name": user.name,
                 "last_topic": last_conv.summary if last_conv else None,
                 "last_interests": last_interests,
@@ -586,9 +484,20 @@ def get_user_conversations(user_id: str) -> list:
 
         results = []
         for conv in conversations:
-            # JSON column type returns Python objects directly
-            messages = conv.messages if conv.messages else []
-            interests = conv.interests if conv.interests else []
+            # Parse JSON strings
+            messages = []
+            if conv.messages:
+                try:
+                    messages = json.loads(conv.messages)
+                except:
+                    messages = []
+
+            interests = []
+            if conv.interests:
+                try:
+                    interests = json.loads(conv.interests)
+                except:
+                    interests = []
 
             results.append({
                 "id": conv.id,
@@ -603,6 +512,81 @@ def get_user_conversations(user_id: str) -> list:
     except Exception as e:
         print(f"Error getting user conversations: {e}")
         return []
+    finally:
+        session.close()
+
+
+def get_all_exchanges(page: int = 1, per_page: int = 50) -> dict:
+    """Get all Q&A exchanges with pagination.
+
+    Parses messages JSON from all conversations and extracts
+    individual user question + assistant response pairs.
+    """
+    session = get_session()
+    if session is None:
+        return {'exchanges': [], 'total': 0, 'page': page, 'per_page': per_page, 'total_pages': 0}
+
+    try:
+        # Get all conversations with user info
+        conversations = (
+            session.query(Conversation, User.name)
+            .join(User, Conversation.user_id == User.id)
+            .order_by(Conversation.created_at.desc())
+            .all()
+        )
+
+        # Extract all Q&A pairs from all conversations
+        all_exchanges = []
+        for conv, user_name in conversations:
+            if not conv.messages:
+                continue
+
+            try:
+                messages = json.loads(conv.messages)
+            except:
+                continue
+
+            # Extract user/assistant pairs
+            i = 0
+            while i < len(messages):
+                if messages[i].get('role') == 'user':
+                    question = messages[i].get('content', '')
+                    answer = ''
+                    # Look for the next assistant message
+                    if i + 1 < len(messages) and messages[i + 1].get('role') == 'assistant':
+                        answer = messages[i + 1].get('content', '')
+                        i += 2
+                    else:
+                        i += 1
+
+                    all_exchanges.append({
+                        'user_name': user_name or 'Unknown',
+                        'user_id': conv.user_id,
+                        'question': question,
+                        'answer': answer,
+                        'timestamp': conv.created_at.isoformat() if conv.created_at else None,
+                        'conversation_id': conv.id
+                    })
+                else:
+                    i += 1
+
+        # Calculate pagination
+        total = len(all_exchanges)
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 0
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated = all_exchanges[start:end]
+
+        return {
+            'exchanges': paginated,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages
+        }
+    except Exception as e:
+        print(f"Error getting exchanges: {e}")
+        return {'exchanges': [], 'total': 0, 'page': page, 'per_page': per_page, 'total_pages': 0}
     finally:
         session.close()
 
@@ -669,7 +653,7 @@ def get_lead_details(user_id: str) -> Optional[dict]:
         conversations = get_user_conversations(user_id)
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name or "Anonymous",
             "email": user.email,
             "company": user.company,
@@ -782,17 +766,22 @@ def get_user_dashboard(user_id: str) -> Optional[dict]:
         conversation_history = []
         all_interests = set()
         for conv in conversations:
-            # Collect interests
+            # Parse interests from JSON string
+            interests = []
             if conv.interests:
-                for interest in conv.interests:
-                    all_interests.add(interest)
+                try:
+                    interests = json.loads(conv.interests)
+                    for interest in interests:
+                        all_interests.add(interest)
+                except:
+                    pass
 
             conversation_history.append({
                 "id": conv.id,
                 "date": conv.created_at.isoformat() if conv.created_at else None,
                 "summary": conv.summary,
                 "lead_score": conv.lead_score,
-                "interests": conv.interests or []
+                "interests": interests
             })
 
         return {
@@ -818,5 +807,267 @@ def get_user_dashboard(user_id: str) -> Optional[dict]:
         import traceback
         traceback.print_exc()
         return None
+    finally:
+        session.close()
+
+
+# ============================================
+# Medium Login Functions
+# ============================================
+
+def get_user_by_name(name: str) -> Optional[dict]:
+    """Find user by exact name match (for medium login)."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = session.query(User).filter(User.name == name).first()
+
+        if user is None:
+            return None
+
+        return {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "auth_method": user.auth_method,
+            "password_hash": user.password_hash,
+            "interest_level": user.interest_level
+        }
+    except Exception as e:
+        print(f"Error getting user by name: {e}")
+        return None
+    finally:
+        session.close()
+
+
+def create_hard_user(user_id: str, name: str, password: str, interest_level: str = None) -> Optional[dict]:
+    """Create or upgrade a user with hard login (password-based)."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        # Hash the password
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        # Check if user already exists (e.g., anonymous user)
+        user = session.query(User).filter(User.id == user_id).first()
+
+        if user:
+            # Upgrade existing user to hard auth
+            user.name = name
+            user.password_hash = password_hash
+            user.interest_level = interest_level
+            user.auth_method = "hard"
+            user.last_seen = datetime.utcnow()
+        else:
+            # Create new user
+            user = User(
+                id=user_id,
+                name=name,
+                password_hash=password_hash,
+                interest_level=interest_level,
+                auth_method="hard"
+            )
+            session.add(user)
+
+        session.commit()
+        session.refresh(user)
+
+        return {
+            "id": str(user.id),
+            "name": user.name,
+            "interest_level": user.interest_level,
+            "auth_method": user.auth_method
+        }
+    except Exception as e:
+        print(f"Error creating hard user: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
+def verify_hard_login(name: str, password: str) -> Optional[dict]:
+    """Verify hard login credentials. Returns user dict if valid."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = session.query(User).filter(User.name == name).first()
+
+        if user is None or user.password_hash is None:
+            return None
+
+        # Verify password
+        if bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+            # Update last_seen
+            user.last_seen = datetime.utcnow()
+            session.commit()
+
+            return {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email,
+                "interest_level": user.interest_level,
+                "auth_method": user.auth_method
+            }
+        return None
+    except Exception as e:
+        print(f"Error verifying hard login: {e}")
+        return None
+    finally:
+        session.close()
+
+
+# ============================================
+# Semantic Facts Functions
+# ============================================
+
+def save_user_fact(user_id: str, fact_type: str, fact_value: str,
+                   confidence: float = 1.0, conversation_id: int = None,
+                   source_text: str = None) -> Optional[int]:
+    """Save a semantic fact about a user. Returns fact ID."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        # Check if this fact type already exists for this user
+        existing = session.query(UserFact).filter(
+            UserFact.user_id == user_id,
+            UserFact.fact_type == fact_type
+        ).first()
+
+        if existing:
+            # Update if new value has higher confidence or is different
+            if confidence >= existing.confidence or fact_value != existing.fact_value:
+                existing.fact_value = fact_value
+                existing.confidence = max(confidence, existing.confidence)
+                existing.source_conversation_id = conversation_id
+                existing.source_text = source_text
+                existing.updated_at = datetime.utcnow()
+                session.commit()
+                return existing.id
+            return existing.id
+
+        # Create new fact
+        fact = UserFact(
+            user_id=user_id,
+            fact_type=fact_type,
+            fact_value=fact_value,
+            confidence=confidence,
+            source_conversation_id=conversation_id,
+            source_text=source_text
+        )
+        session.add(fact)
+        session.commit()
+        return fact.id
+    except Exception as e:
+        print(f"Error saving user fact: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
+def save_user_facts(user_id: str, facts: list, conversation_id: int = None) -> int:
+    """Save multiple facts for a user. Returns count of facts saved."""
+    saved_count = 0
+    for fact in facts:
+        fact_type = fact.get("type")
+        fact_value = fact.get("value")
+        confidence = fact.get("confidence", 1.0)
+        source_text = fact.get("source_text")
+
+        if fact_type and fact_value:
+            result = save_user_fact(
+                user_id=user_id,
+                fact_type=fact_type,
+                fact_value=fact_value,
+                confidence=confidence,
+                conversation_id=conversation_id,
+                source_text=source_text
+            )
+            if result:
+                saved_count += 1
+    return saved_count
+
+
+def get_user_facts(user_id: str, min_confidence: float = 0.5) -> list:
+    """Get all facts for a user above confidence threshold."""
+    session = get_session()
+    if session is None:
+        return []
+
+    try:
+        facts = session.query(UserFact).filter(
+            UserFact.user_id == user_id,
+            UserFact.confidence >= min_confidence
+        ).order_by(UserFact.fact_type, UserFact.confidence.desc()).all()
+
+        return [
+            {
+                "id": f.id,
+                "type": f.fact_type,
+                "value": f.fact_value,
+                "confidence": f.confidence,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+                "updated_at": f.updated_at.isoformat() if f.updated_at else None
+            }
+            for f in facts
+        ]
+    except Exception as e:
+        print(f"Error getting user facts: {e}")
+        return []
+    finally:
+        session.close()
+
+
+def get_user_facts_dict(user_id: str, min_confidence: float = 0.6) -> dict:
+    """Get facts as a dict (fact_type -> fact_value) for context injection."""
+    session = get_session()
+    if session is None:
+        return {}
+
+    try:
+        facts = session.query(UserFact).filter(
+            UserFact.user_id == user_id,
+            UserFact.confidence >= min_confidence
+        ).order_by(UserFact.confidence.desc()).all()
+
+        # Return dict with highest confidence fact for each type
+        facts_dict = {}
+        for f in facts:
+            if f.fact_type not in facts_dict:
+                facts_dict[f.fact_type] = f.fact_value
+        return facts_dict
+    except Exception as e:
+        print(f"Error getting user facts dict: {e}")
+        return {}
+    finally:
+        session.close()
+
+
+def delete_user_fact(fact_id: int) -> bool:
+    """Delete a specific fact."""
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        fact = session.query(UserFact).filter(UserFact.id == fact_id).first()
+        if fact:
+            session.delete(fact)
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error deleting user fact: {e}")
+        session.rollback()
+        return False
     finally:
         session.close()

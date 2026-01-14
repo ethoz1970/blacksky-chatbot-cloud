@@ -1,42 +1,52 @@
 """
-Core chatbot logic using Anthropic Claude
+Core chatbot logic using llama-cpp-python
 """
-from anthropic import Anthropic
-
+from llama_cpp import Llama
 from config import (
-    ANTHROPIC_API_KEY,
-    ANTHROPIC_MODEL,
-    MAX_TOKENS,
-    MAX_HISTORY_TURNS
+    MODEL_PATH, N_GPU_LAYERS, N_THREADS, N_CTX, N_BATCH,
+    MAX_TOKENS, TEMPERATURE, TOP_P, REPEAT_PENALTY, MAX_HISTORY_TURNS
 )
 from prompts import SYSTEM_PROMPT
+from download_model import download_model
 from rag import DocumentStore
 
 
 class BlackskyChatbot:
-    """Chatbot wrapper using Anthropic Claude for inference."""
-
+    """Chatbot wrapper around TinyLlama with conversation management."""
+    
     def __init__(self, use_rag: bool = True):
-        self.client = None
+        self.model = None
         self.conversation_history = []
         self.use_rag = use_rag
         self.doc_store = None
-
-    def initialize(self):
-        """Initialize Anthropic client and RAG."""
-        print("Initializing Blacksky Chatbot (Cloud)...")
-
-        # Initialize Anthropic client
-        self.client = Anthropic(api_key=ANTHROPIC_API_KEY)
-        print("✓ Anthropic Claude client ready")
+        
+    def load_model(self):
+        """Load the model into memory."""
+        if not MODEL_PATH.exists():
+            print("Model not found locally, downloading...")
+            download_model()
+        
+        print(f"Loading model from {MODEL_PATH}...")
+        print(f"  GPU layers: {N_GPU_LAYERS}")
+        print(f"  Threads: {N_THREADS}")
+        print(f"  Context: {N_CTX}")
+        
+        self.model = Llama(
+            model_path=str(MODEL_PATH),
+            n_gpu_layers=N_GPU_LAYERS,
+            n_threads=N_THREADS,
+            n_ctx=N_CTX,
+            n_batch=N_BATCH,
+            verbose=False
+        )
+        print("✓ Model loaded successfully!")
         
         # Initialize RAG if enabled
         if self.use_rag:
             self.doc_store = DocumentStore()
             self.doc_store.initialize()
-        
         print()
-        
+
     def _build_user_context_prompt(self, user_context: dict, potential_matches: list = None) -> str:
         """Build a context string for returning users and potential matches."""
         parts = []
@@ -57,28 +67,33 @@ class BlackskyChatbot:
         # Add potential matches for verification
         if potential_matches and len(potential_matches) > 0:
             parts.append("\nPOTENTIAL MATCHES (user just provided their name - verify their identity):")
-            for i, match in enumerate(potential_matches[:3]):  # Max 3 matches
+            for match in potential_matches[:3]:
                 topic = match.get('last_topic', 'general questions')
                 parts.append(f"  - {match.get('name')} who previously asked about: {topic}")
+
+        # Add semantic facts about the user
+        if user_context and user_context.get("facts"):
+            parts.append("\nKNOWN FACTS ABOUT THIS USER:")
+            for fact_type, value in user_context["facts"].items():
+                # Format fact type nicely (e.g., "pain_point" -> "Pain Point")
+                label = fact_type.replace("_", " ").title()
+                parts.append(f"  {label}: {value}")
 
         if not parts:
             return ""
 
         return "\n\nUSER CONTEXT:\n" + "\n".join(parts)
 
-    def chat(self, user_message: str, user_context: dict = None, potential_matches: list = None) -> str:
-        """Generate a response to the user's message."""
-        if self.client is None:
-            raise RuntimeError("Client not initialized. Call initialize() first.")
-
-        # Get RAG context if enabled
+    def _build_prompt(self, user_message: str, user_context: dict = None, potential_matches: list = None) -> str:
+        """
+        Build the full prompt with system message and conversation history.
+        Uses Llama 3.1 instruct format with special tokens.
+        """
+        # Get RAG context if enabled and documents exist
         rag_context = ""
-        if self.use_rag and self.doc_store:
-            try:
-                rag_context = self.doc_store.get_context(user_message)
-            except Exception as e:
-                print(f"RAG error: {e}")
-
+        if self.use_rag and self.doc_store and self.doc_store.collection.count() > 0:
+            rag_context = self.doc_store.get_context(user_message)
+        
         # Build system prompt with optional RAG context and user context
         system_content = SYSTEM_PROMPT
         if rag_context:
@@ -88,85 +103,93 @@ class BlackskyChatbot:
         if context_prompt:
             system_content += context_prompt
 
-        # Build messages array (Anthropic format - no system message in array)
-        messages = []
-
+        # Llama 3.1 format (no begin_of_text - llama.cpp adds it automatically)
+        prompt = f"<|start_header_id|>system<|end_header_id|>\n\n{system_content}<|eot_id|>"
+        
         # Add conversation history
         for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
-            messages.append({"role": "user", "content": turn["user"]})
-            messages.append({"role": "assistant", "content": turn["assistant"]})
-
+            prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{turn['user']}<|eot_id|>"
+            prompt += f"<|start_header_id|>assistant<|end_header_id|>\n\n{turn['assistant']}<|eot_id|>"
+        
         # Add current user message
-        messages.append({"role": "user", "content": user_message})
+        prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{user_message}<|eot_id|>"
+        prompt += f"<|start_header_id|>assistant<|end_header_id|>\n\n"
+        
+        return prompt
+    
+    def chat(self, user_message: str, user_context: dict = None, potential_matches: list = None) -> str:
+        """
+        Generate a response to the user's message.
+        """
+        if self.model is None:
+            raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        # Call Anthropic Claude
-        response = self.client.messages.create(
-            model=ANTHROPIC_MODEL,
+        prompt = self._build_prompt(user_message, user_context, potential_matches)
+        
+        # Debug: log prompt size
+        print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")
+        
+        # Generate response
+        output = self.model(
+            prompt,
             max_tokens=MAX_TOKENS,
-            system=system_content,
-            messages=messages
+            temperature=TEMPERATURE,
+            top_p=TOP_P,
+            repeat_penalty=REPEAT_PENALTY,
+            stop=["<|eot_id|>", "<|start_header_id|>"],
+            echo=False
         )
-
-        assistant_message = response.content[0].text.strip()
-
+        
+        response = output["choices"][0]["text"].strip()
+        
+        # Debug: log response
+        print(f"[DEBUG] Response length: {len(response)} chars")
+        print(f"[DEBUG] Response: {repr(response[:200])}")
+        
         # Store in history
         self.conversation_history.append({
             "user": user_message,
-            "assistant": assistant_message
+            "assistant": response
         })
-
-        return assistant_message
+        
+        return response
     
     def chat_stream(self, user_message: str, user_context: dict = None, potential_matches: list = None):
-        """Generate a streaming response to the user's message."""
-        if self.client is None:
-            raise RuntimeError("Client not initialized. Call initialize() first.")
+        """
+        Generate a streaming response to the user's message.
+        Yields tokens as they are generated.
+        """
+        if self.model is None:
+            raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        # Get RAG context if enabled
-        rag_context = ""
-        if self.use_rag and self.doc_store:
-            try:
-                rag_context = self.doc_store.get_context(user_message)
-            except Exception as e:
-                print(f"RAG error: {e}")
-
-        # Build system prompt with optional RAG context and user context
-        system_content = SYSTEM_PROMPT
-        if rag_context:
-            system_content = f"{SYSTEM_PROMPT}\n\n{rag_context}"
-        # Add user context and potential matches
-        context_prompt = self._build_user_context_prompt(user_context, potential_matches)
-        if context_prompt:
-            system_content += context_prompt
-
-        # Build messages array (Anthropic format - no system message in array)
-        messages = []
-
-        # Add conversation history
-        for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
-            messages.append({"role": "user", "content": turn["user"]})
-            messages.append({"role": "assistant", "content": turn["assistant"]})
-
-        # Add current user message
-        messages.append({"role": "user", "content": user_message})
-
-        # Call Anthropic Claude with streaming
+        prompt = self._build_prompt(user_message, user_context, potential_matches)
+        
+        # Debug: log prompt size
+        print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")
+        
+        # Generate response with streaming
         full_response = ""
-        with self.client.messages.stream(
-            model=ANTHROPIC_MODEL,
+        for output in self.model(
+            prompt,
             max_tokens=MAX_TOKENS,
-            system=system_content,
-            messages=messages
-        ) as stream:
-            for text in stream.text_stream:
-                full_response += text
-                yield text
-
+            temperature=TEMPERATURE,
+            top_p=TOP_P,
+            repeat_penalty=REPEAT_PENALTY,
+            stop=["<|eot_id|>", "<|start_header_id|>"],
+            echo=False,
+            stream=True
+        ):
+            token = output["choices"][0]["text"]
+            full_response += token
+            yield token
+        
         # Store in history after streaming completes
         self.conversation_history.append({
             "user": user_message,
             "assistant": full_response.strip()
         })
+        
+        print(f"[DEBUG] Response length: {len(full_response)} chars")
     
     def clear_history(self):
         """Clear conversation history."""
@@ -178,27 +201,25 @@ class BlackskyChatbot:
         stats = {
             "history_turns": len(self.conversation_history),
             "max_history": MAX_HISTORY_TURNS,
-            "model": ANTHROPIC_MODEL,
+            "context_size": N_CTX,
+            "gpu_layers": N_GPU_LAYERS,
             "rag_enabled": self.use_rag
         }
         if self.use_rag and self.doc_store:
-            try:
-                rag_stats = self.doc_store.get_stats()
-                stats["indexed_vectors"] = rag_stats["total_vectors"]
-            except Exception:
-                stats["indexed_vectors"] = 0
+            stats["indexed_chunks"] = self.doc_store.collection.count()
+            stats["indexed_documents"] = len(self.doc_store.list_documents())
         return stats
 
 
 # CLI interface for testing
 if __name__ == "__main__":
     print("=" * 50)
-    print("Blacksky Chatbot (Cloud) - CLI Mode")
+    print("Blacksky Chatbot - CLI Mode")
     print("=" * 50)
-    print("Commands: /clear (reset history), /stats, /quit\n")
+    print("Commands: /clear (reset history), /stats, /docs, /quit\n")
     
     bot = BlackskyChatbot(use_rag=True)
-    bot.initialize()
+    bot.load_model()
     
     while True:
         try:
@@ -214,6 +235,13 @@ if __name__ == "__main__":
                 continue
             elif user_input.lower() == "/stats":
                 print(f"Stats: {bot.get_stats()}")
+                continue
+            elif user_input.lower() == "/docs":
+                if bot.doc_store:
+                    docs = bot.doc_store.list_documents()
+                    print(f"Indexed documents: {docs if docs else 'None'}")
+                else:
+                    print("RAG not enabled")
                 continue
             
             response = bot.chat(user_input)

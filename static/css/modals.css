@@ -1,0 +1,138 @@
+/* Medium Login Modal styles */
+
+.medium-login-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.medium-login-overlay.active {
+  display: flex;
+}
+
+.medium-login-modal {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 380px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.medium-login-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.medium-login-header h3 {
+  margin: 0;
+  color: #00ff00;
+  font-size: 1.3em;
+}
+
+.medium-login-close {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.medium-login-close:hover {
+  color: #fff;
+}
+
+.medium-login-field {
+  margin-bottom: 16px;
+}
+
+.medium-login-field label {
+  display: block;
+  color: #888;
+  font-size: 0.85em;
+  margin-bottom: 6px;
+}
+
+.medium-login-field input,
+.medium-login-field select {
+  width: 100%;
+  padding: 12px;
+  background: #0d0d0d;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1em;
+  box-sizing: border-box;
+}
+
+.medium-login-field input:focus,
+.medium-login-field select:focus {
+  outline: none;
+  border-color: #00ff00;
+}
+
+.medium-login-field select {
+  cursor: pointer;
+}
+
+.medium-login-error {
+  color: #ff4444;
+  font-size: 0.85em;
+  margin-bottom: 12px;
+  min-height: 20px;
+}
+
+.medium-login-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.medium-login-submit {
+  width: 100%;
+  padding: 12px;
+  background: #00ff00;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 1em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.medium-login-submit:hover {
+  background: #00cc00;
+}
+
+.medium-login-submit:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.medium-login-alt {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.85em;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.medium-login-alt:hover {
+  color: #00ff00;
+}
