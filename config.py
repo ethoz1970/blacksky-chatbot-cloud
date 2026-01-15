@@ -64,15 +64,13 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-prod")
 USE_CLOUD_LLM = os.getenv("USE_CLOUD_LLM", "false").lower() == "true"
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
 TOGETHER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
-TOGETHER_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
+TOGETHER_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # 384 dim to match existing index
 
 # Pinecone settings (for RAG)
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "blacksky-docs")
-# Local uses all-MiniLM-L6-v2 (384), Cloud uses bge-base-en-v1.5 (768)
-PINECONE_DIMENSION_LOCAL = 384
-PINECONE_DIMENSION_CLOUD = 768
-PINECONE_DIMENSION = PINECONE_DIMENSION_CLOUD if USE_CLOUD_LLM else PINECONE_DIMENSION_LOCAL
+# Local uses 'blacksky', Cloud uses 'blacksky-docs'
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "blacksky-docs" if USE_CLOUD_LLM else "blacksky")
+PINECONE_DIMENSION = 384  # Both local and cloud use 384 dim embeddings
 
 # Document settings
 DOCS_DIR = Path(__file__).parent / "documents"
