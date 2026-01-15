@@ -1,0 +1,7 @@
+In The Art of War, Sun Tzu identifies five constant factors that must be analyzed to determine the outcome of a conflict. These are explored in the first chapter, "Laying Plans," as the fundamental pillars of strategic assessment: 
+The Moral Law (The Way/Tao): This refers to the harmony and shared purpose between the people and their ruler. When the Moral Law is strong, the people will follow their leader into danger without fear or hesitation.
+Heaven: This signifies the environmental conditions beyond human control, such as day and night, cold and heat, and the changing seasons.
+Earth: This represents the physical terrain, including distances, the ease or difficulty of travel, open ground versus narrow passes, and the geographical chances of life and death.
+The Commander: This factor focuses on the virtues of the leader, specifically their wisdom, sincerity, benevolence, courage, and strictness.
+Method and Discipline: This pertains to the organization of the army, the chain of command, the management of supply routes (logistics), and the control of military expenditure. 
+Sun Tzu taught that a general who masters these five factors will be victorious, while one who neglects them will face defeat.
