@@ -5,8 +5,6 @@ Uses Pinecone for vector storage and sentence-transformers for embeddings
 import os
 from pathlib import Path
 from typing import List
-from pinecone import Pinecone, ServerlessSpec
-from sentence_transformers import SentenceTransformer
 
 from config import (
     PINECONE_API_KEY,
@@ -17,6 +15,22 @@ from config import (
     CHUNK_OVERLAP,
     TOP_K
 )
+
+# Lazy imports - only load heavy dependencies when actually used
+Pinecone = None
+ServerlessSpec = None
+SentenceTransformer = None
+
+
+def _load_dependencies():
+    """Load heavy dependencies only when needed."""
+    global Pinecone, ServerlessSpec, SentenceTransformer
+    if Pinecone is None:
+        from pinecone import Pinecone as _Pinecone, ServerlessSpec as _ServerlessSpec
+        from sentence_transformers import SentenceTransformer as _SentenceTransformer
+        Pinecone = _Pinecone
+        ServerlessSpec = _ServerlessSpec
+        SentenceTransformer = _SentenceTransformer
 
 
 class DocumentStore:
@@ -30,10 +44,13 @@ class DocumentStore:
     def initialize(self):
         """Initialize Pinecone and embedding model."""
         print("Initializing document store...")
-        
+
+        # Load heavy dependencies
+        _load_dependencies()
+
         # Create documents directory if needed
         DOCS_DIR.mkdir(exist_ok=True)
-        
+
         # Initialize embedding model
         print("  Loading embedding model...")
         self.encoder = SentenceTransformer('all-MiniLM-L6-v2')
