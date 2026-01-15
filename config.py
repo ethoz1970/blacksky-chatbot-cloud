@@ -58,3 +58,9 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "localdev")
 
 # JWT secret for token signing
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-prod")
+
+# Cloud LLM settings (Together AI with Llama 3.1)
+# Set USE_CLOUD_LLM=true in Railway environment variables
+USE_CLOUD_LLM = os.getenv("USE_CLOUD_LLM", "false").lower() == "true"
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
+TOGETHER_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"

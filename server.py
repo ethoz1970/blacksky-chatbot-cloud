@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 import jwt
 
 from chatbot import BlackskyChatbot
-from config import HOST, PORT, ADMIN_PASSWORD, JWT_SECRET_KEY
+from config import HOST, PORT, ADMIN_PASSWORD, JWT_SECRET_KEY, USE_CLOUD_LLM
 from rag import DocumentStore, DOCS_DIR
 from database import (
     init_db, get_or_create_user, update_user, save_conversation, update_conversation,
@@ -41,7 +41,8 @@ bot = BlackskyChatbot(use_rag=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load model on startup."""
-    print("Starting Blacksky Chatbot Server (Local)...")
+    mode = "Cloud (Together AI)" if USE_CLOUD_LLM else "Local"
+    print(f"Starting Blacksky Chatbot Server ({mode})...")
     bot.load_model()
 
     # Initialize database
@@ -57,8 +58,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Blacksky Chatbot API (Local)",
-    description="A friendly chatbot for Blacksky LLC - Local Development",
+    title=f"Blacksky Chatbot API ({'Cloud' if USE_CLOUD_LLM else 'Local'})",
+    description="A friendly chatbot for Blacksky LLC",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -134,7 +135,7 @@ async def root():
     """Health check endpoint."""
     return {
         "status": "online",
-        "service": "Blacksky Chatbot (Local)",
+        "service": f"Blacksky Chatbot ({'Cloud' if USE_CLOUD_LLM else 'Local'})",
         "version": "1.0.0"
     }
 
