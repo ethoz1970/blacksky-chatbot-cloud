@@ -7,6 +7,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Build version - increment this to verify Railway is deploying new code
+BUILD_VERSION = "v2.1.0-2026.01.15"
+print(f"[CONFIG] Build version: {BUILD_VERSION}")
+
 # Load environment variables
 load_dotenv()
 
