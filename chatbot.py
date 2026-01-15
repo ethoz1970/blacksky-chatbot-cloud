@@ -57,10 +57,12 @@ class BlackskyChatbot:
             )
             print("✓ Model loaded successfully!")
 
-        # Initialize RAG if enabled
-        if self.use_rag:
+        # Initialize RAG if enabled (skip in cloud mode - sentence-transformers too heavy)
+        if self.use_rag and not self.is_cloud:
             self.doc_store = DocumentStore()
             self.doc_store.initialize()
+        elif self.is_cloud:
+            print("RAG disabled in cloud mode (use Together embeddings API for cloud RAG)")
         print()
 
     def _build_user_context_prompt(self, user_context: dict, potential_matches: list = None) -> str:
