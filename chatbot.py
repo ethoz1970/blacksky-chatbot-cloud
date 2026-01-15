@@ -9,13 +9,6 @@ from config import (
 from prompts import SYSTEM_PROMPT
 from rag import DocumentStore
 
-# Conditional imports based on mode
-if USE_CLOUD_LLM:
-    from together import Together
-else:
-    from llama_cpp import Llama
-    from download_model import download_model
-
 
 class BlackskyChatbot:
     """Chatbot wrapper supporting both local Llama and cloud Together AI."""
@@ -32,12 +25,16 @@ class BlackskyChatbot:
         """Load the model - local file or cloud API client."""
         if self.is_cloud:
             # Cloud mode: Initialize Together AI client
+            from together import Together
             print("Initializing Together AI client...")
             print(f"  Model: {TOGETHER_MODEL}")
             self.client = Together(api_key=TOGETHER_API_KEY)
             print("✓ Together AI client ready!")
         else:
             # Local mode: Load GGUF model
+            from llama_cpp import Llama
+            from download_model import download_model
+
             if not MODEL_PATH.exists():
                 print("Model not found locally, downloading...")
                 download_model()
