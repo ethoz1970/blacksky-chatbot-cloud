@@ -1,6 +1,8 @@
 """
 RAG (Retrieval-Augmented Generation) module for Blacksky Chatbot
-Uses Pinecone for vector storage and sentence-transformers for embeddings
+Uses Pinecone for vector storage
+- Local: sentence-transformers for embeddings
+- Cloud: Together AI embeddings API
 """
 import os
 from pathlib import Path
@@ -13,57 +15,65 @@ from config import (
     DOCS_DIR,
     CHUNK_SIZE,
     CHUNK_OVERLAP,
-    TOP_K
+    TOP_K,
+    USE_CLOUD_LLM,
+    TOGETHER_API_KEY,
+    TOGETHER_EMBEDDING_MODEL
 )
 
-# Lazy imports - only load heavy dependencies when actually used
+# Lazy imports - only load when needed
 Pinecone = None
 ServerlessSpec = None
-SentenceTransformer = None
 
 
-def _load_dependencies():
-    """Load heavy dependencies only when needed."""
-    global Pinecone, ServerlessSpec, SentenceTransformer
+def _load_pinecone():
+    """Load Pinecone dependencies."""
+    global Pinecone, ServerlessSpec
     if Pinecone is None:
         from pinecone import Pinecone as _Pinecone, ServerlessSpec as _ServerlessSpec
-        from sentence_transformers import SentenceTransformer as _SentenceTransformer
         Pinecone = _Pinecone
         ServerlessSpec = _ServerlessSpec
-        SentenceTransformer = _SentenceTransformer
 
 
 class DocumentStore:
     """Manages document storage and retrieval using Pinecone."""
-    
+
     def __init__(self):
         self.pc = None
         self.index = None
-        self.encoder = None
-        
+        self.encoder = None  # SentenceTransformer for local
+        self.together_client = None  # Together client for cloud
+        self.is_cloud = USE_CLOUD_LLM
+
     def initialize(self):
         """Initialize Pinecone and embedding model."""
         print("Initializing document store...")
 
-        # Load heavy dependencies
-        _load_dependencies()
+        # Load Pinecone
+        _load_pinecone()
 
         # Create documents directory if needed
         DOCS_DIR.mkdir(exist_ok=True)
 
-        # Initialize embedding model
-        print("  Loading embedding model...")
-        self.encoder = SentenceTransformer('all-MiniLM-L6-v2')
-        
+        # Initialize embedding model based on mode
+        if self.is_cloud:
+            print(f"  Using Together AI embeddings ({TOGETHER_EMBEDDING_MODEL})...")
+            from together import Together
+            self.together_client = Together(api_key=TOGETHER_API_KEY)
+        else:
+            print("  Loading local embedding model (all-MiniLM-L6-v2)...")
+            from sentence_transformers import SentenceTransformer
+            self.encoder = SentenceTransformer('all-MiniLM-L6-v2')
+
         # Initialize Pinecone
         print("  Connecting to Pinecone...")
         self.pc = Pinecone(api_key=PINECONE_API_KEY)
-        
+
         # Create index if it doesn't exist
         existing_indexes = [idx.name for idx in self.pc.list_indexes()]
-        
+
         if PINECONE_INDEX_NAME not in existing_indexes:
-            print(f"  Creating index '{PINECONE_INDEX_NAME}'...")
+            print(f"  Creating index '{PINECONE_INDEX_NAME}' (dim={PINECONE_DIMENSION})...")
             self.pc.create_index(
                 name=PINECONE_INDEX_NAME,
                 dimension=PINECONE_DIMENSION,
@@ -73,26 +83,43 @@ class DocumentStore:
                     region="us-east-1"
                 )
             )
-        
+
         self.index = self.pc.Index(PINECONE_INDEX_NAME)
-        
+
         # Get stats
         stats = self.index.describe_index_stats()
         print(f"✓ Document store ready. {stats.total_vector_count} vectors indexed.")
-        
+
+    def _encode(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for a list of texts."""
+        if self.is_cloud:
+            # Use Together AI embeddings
+            response = self.together_client.embeddings.create(
+                model=TOGETHER_EMBEDDING_MODEL,
+                input=texts
+            )
+            return [item.embedding for item in response.data]
+        else:
+            # Use local sentence-transformers
+            return self.encoder.encode(texts).tolist()
+
+    def _encode_single(self, text: str) -> List[float]:
+        """Generate embedding for a single text."""
+        return self._encode([text])[0]
+
     def _chunk_text(self, text: str, source: str) -> List[dict]:
         """Split text into overlapping chunks."""
         chunks = []
         start = 0
         chunk_id = 0
-        
+
         # Clean the text
         text = text.replace('---', ' ').replace('###', ' ').replace('##', ' ').replace('#', ' ')
-        
+
         while start < len(text):
             end = start + CHUNK_SIZE
             chunk = text[start:end]
-            
+
             # Try to break at sentence boundary
             if end < len(text):
                 last_period = chunk.rfind('.')
@@ -101,7 +128,7 @@ class DocumentStore:
                 if break_point > CHUNK_SIZE // 2:
                     chunk = chunk[:break_point + 1]
                     end = start + break_point + 1
-            
+
             chunk_text = chunk.strip()
             if chunk_text:
                 chunks.append({
@@ -110,36 +137,36 @@ class DocumentStore:
                     "source": source
                 })
                 chunk_id += 1
-            
+
             start = end - CHUNK_OVERLAP
-            
+
         return chunks
-    
+
     def add_document(self, filepath: Path) -> int:
         """Add a document to the store. Returns number of chunks added."""
         if not filepath.exists():
             raise FileNotFoundError(f"Document not found: {filepath}")
-        
+
         text = filepath.read_text(encoding='utf-8')
         source = filepath.name
-        
+
         # Delete existing vectors from this source
         try:
             # List and delete vectors with this source prefix
             self.index.delete(filter={"source": source})
         except Exception:
             pass  # Index might be empty
-        
+
         # Chunk the document
         chunks = self._chunk_text(text, source)
-        
+
         if not chunks:
             return 0
-        
+
         # Generate embeddings
         texts = [c["text"] for c in chunks]
-        embeddings = self.encoder.encode(texts).tolist()
-        
+        embeddings = self._encode(texts)
+
         # Upsert to Pinecone
         vectors = [
             {
@@ -149,34 +176,34 @@ class DocumentStore:
             }
             for c, emb in zip(chunks, embeddings)
         ]
-        
+
         self.index.upsert(vectors=vectors)
-        
+
         print(f"  Added {len(chunks)} chunks from {source}")
         return len(chunks)
-    
+
     def load_all_documents(self) -> int:
         """Load all documents from the documents directory."""
         total_chunks = 0
-        
+
         for ext in ['*.txt', '*.md']:
             for filepath in DOCS_DIR.glob(ext):
                 total_chunks += self.add_document(filepath)
-        
+
         return total_chunks
-    
+
     def search(self, query: str, top_k: int = TOP_K) -> List[dict]:
         """Search for relevant document chunks."""
         # Generate query embedding
-        query_embedding = self.encoder.encode(query).tolist()
-        
+        query_embedding = self._encode_single(query)
+
         # Query Pinecone
         results = self.index.query(
             vector=query_embedding,
             top_k=top_k,
             include_metadata=True
         )
-        
+
         # Format results
         chunks = []
         for match in results.matches:
@@ -185,22 +212,22 @@ class DocumentStore:
                 "source": match.metadata.get("source", ""),
                 "score": match.score
             })
-        
+
         return chunks
-    
+
     def get_context(self, query: str, top_k: int = TOP_K) -> str:
         """Get formatted context string for injection into prompt."""
         chunks = self.search(query, top_k)
-        
+
         if not chunks:
             return ""
-        
+
         context_parts = ["Reference information (use naturally, do not copy formatting):"]
         for chunk in chunks:
             context_parts.append(chunk['text'])
-        
+
         return "\n\n".join(context_parts)
-    
+
     def get_stats(self) -> dict:
         """Get index statistics."""
         stats = self.index.describe_index_stats()
@@ -208,7 +235,7 @@ class DocumentStore:
             "total_vectors": stats.total_vector_count,
             "dimension": stats.dimension
         }
-    
+
     def clear(self):
         """Clear all documents from the store."""
         self.index.delete(delete_all=True)
@@ -218,10 +245,10 @@ class DocumentStore:
 # CLI for managing documents
 if __name__ == "__main__":
     import sys
-    
+
     store = DocumentStore()
     store.initialize()
-    
+
     if len(sys.argv) < 2:
         print("\nUsage:")
         print("  python rag.py load           - Load all docs from ./documents/")
@@ -230,18 +257,18 @@ if __name__ == "__main__":
         print("  python rag.py stats          - Show index stats")
         print("  python rag.py clear          - Clear all documents")
         sys.exit(0)
-    
+
     command = sys.argv[1]
-    
+
     if command == "load":
         count = store.load_all_documents()
         print(f"\nLoaded {count} total chunks.")
-        
+
     elif command == "add" and len(sys.argv) > 2:
         filepath = Path(sys.argv[2])
         count = store.add_document(filepath)
         print(f"\nAdded {count} chunks.")
-        
+
     elif command == "search" and len(sys.argv) > 2:
         query = " ".join(sys.argv[2:])
         print(f"\nSearching for: {query}\n")
@@ -251,13 +278,13 @@ if __name__ == "__main__":
             print(f"Source: {chunk['source']}")
             print(chunk['text'][:300] + "..." if len(chunk['text']) > 300 else chunk['text'])
             print()
-            
+
     elif command == "stats":
         stats = store.get_stats()
         print(f"\nIndex stats: {stats}")
-            
+
     elif command == "clear":
         store.clear()
-        
+
     else:
         print("Unknown command. Run without arguments for help.")
