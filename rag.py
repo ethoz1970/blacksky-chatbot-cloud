@@ -236,6 +236,14 @@ class DocumentStore:
             "dimension": stats.dimension
         }
 
+    def list_documents(self) -> List[str]:
+        """List all indexed document sources (from local documents directory)."""
+        sources = []
+        for ext in ['*.txt', '*.md']:
+            for filepath in DOCS_DIR.glob(ext):
+                sources.append(filepath.name)
+        return sources
+
     def clear(self):
         """Clear all documents from the store."""
         self.index.delete(delete_all=True)

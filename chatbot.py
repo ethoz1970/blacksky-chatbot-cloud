@@ -101,7 +101,7 @@ class BlackskyChatbot:
         """Build the system prompt with RAG and user context."""
         # Get RAG context if enabled and documents exist
         rag_context = ""
-        if self.use_rag and self.doc_store and self.doc_store.collection.count() > 0:
+        if self.use_rag and self.doc_store and self.doc_store.get_stats()["total_vectors"] > 0:
             rag_context = self.doc_store.get_context(user_message)
 
         # Build system prompt with optional RAG context and user context
@@ -293,7 +293,7 @@ class BlackskyChatbot:
             stats["context_size"] = N_CTX
             stats["gpu_layers"] = N_GPU_LAYERS
         if self.use_rag and self.doc_store:
-            stats["indexed_chunks"] = self.doc_store.collection.count()
+            stats["indexed_chunks"] = self.doc_store.get_stats()["total_vectors"]
             stats["indexed_documents"] = len(self.doc_store.list_documents())
         return stats
 

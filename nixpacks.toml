@@ -1,0 +1,15 @@
+# Nixpacks configuration for Railway deployment
+# Prevents sensitive environment variables from being baked into Docker image
+
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
+
+[start]
+cmd = "python server.py"
+
+# Don't include these variables at build time (they're runtime-only secrets)
+[variables]
+# Empty section - all env vars should come from Railway runtime, not build

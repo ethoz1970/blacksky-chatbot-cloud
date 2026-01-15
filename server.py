@@ -1214,7 +1214,7 @@ async def list_documents():
         raise HTTPException(status_code=400, detail="RAG not enabled")
     return {
         "documents": bot.doc_store.list_documents(),
-        "total_chunks": bot.doc_store.collection.count()
+        "total_chunks": bot.doc_store.get_stats()["total_vectors"]
     }
 
 
