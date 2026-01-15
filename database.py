@@ -94,12 +94,19 @@ def init_db():
     global engine, SessionLocal
 
     try:
-        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+        # check_same_thread is only for SQLite
+        if DATABASE_URL.startswith("sqlite"):
+            engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+            db_type = "SQLite"
+        else:
+            engine = create_engine(DATABASE_URL)
+            db_type = "PostgreSQL"
+
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
         # Create tables if they don't exist
         Base.metadata.create_all(bind=engine)
-        print(f"SQLite database ready: {DATABASE_PATH}")
+        print(f"{db_type} database ready")
         return True
     except Exception as e:
         print(f"Database connection failed: {e}")

@@ -65,13 +65,15 @@ TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
 USE_CLOUD_LLM = bool(TOGETHER_API_KEY)  # True if API key is set
 print(f"[CONFIG] USE_CLOUD_LLM={USE_CLOUD_LLM} (TOGETHER_API_KEY={'set' if TOGETHER_API_KEY else 'not set'})")
 TOGETHER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
-TOGETHER_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # 384 dim to match existing index
+TOGETHER_EMBEDDING_MODEL = "togethercomputer/m2-bert-80M-8k-retrieval"  # 768 dim
 
 # Pinecone settings (for RAG)
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "")
-# Local uses 'blacksky', Cloud uses 'blacksky-docs'
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "blacksky-docs" if USE_CLOUD_LLM else "blacksky")
-PINECONE_DIMENSION = 384  # Both local and cloud use 384 dim embeddings
+# Local uses 'blacksky' (384 dim), Cloud uses 'blacksky-cloud' (768 dim)
+PINECONE_INDEX_NAME_LOCAL = "blacksky"
+PINECONE_INDEX_NAME_CLOUD = "blacksky-cloud"
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", PINECONE_INDEX_NAME_CLOUD if USE_CLOUD_LLM else PINECONE_INDEX_NAME_LOCAL)
+PINECONE_DIMENSION = 768 if USE_CLOUD_LLM else 384
 
 # Document settings
 DOCS_DIR = Path(__file__).parent / "documents"
