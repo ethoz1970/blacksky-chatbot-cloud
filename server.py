@@ -591,6 +591,7 @@ async def admin_dashboard(password: str = Query(None)):
         notes_preview = (lead.get('notes') or '')[:30]
         if len(lead.get('notes') or '') > 30:
             notes_preview += '...'
+        notes_display = notes_preview or '<span style="color:#444">+ Add</span>'
         email = lead.get('email') or ''
         email_btn = f'<a href="mailto:{email}" class="action-btn" title="Send email">@</a>' if email else ''
 
@@ -609,7 +610,7 @@ async def admin_dashboard(password: str = Query(None)):
                         <option value="archived" {"selected" if status == "archived" else ""}>Archived</option>
                     </select>
                 </td>
-                <td class="notes-cell clickable" onclick="editNotes('{lead['id']}')" title="Click to edit notes">{notes_preview or '<span style=\"color:#444\">+ Add</span>'}</td>
+                <td class="notes-cell clickable" onclick="editNotes('{lead['id']}')" title="Click to edit notes">{notes_display}</td>
                 <td style="color: #666;">{lead['last_seen'][:10] if lead.get('last_seen') else '-'}</td>
                 <td class="actions-cell">
                     <button class="action-btn delete-btn" onclick="deleteLead('{lead['id']}', '{lead['name']}')" title="Delete lead">X</button>
