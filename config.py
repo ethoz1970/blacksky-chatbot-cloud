@@ -60,11 +60,10 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "localdev")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-prod")
 
 # Cloud LLM settings (Together AI with Llama 3.1 70B)
-# Set USE_CLOUD_LLM=true in Railway environment variables
-_cloud_env = os.getenv("USE_CLOUD_LLM", "false")
-USE_CLOUD_LLM = _cloud_env.strip().lower() == "true"
-print(f"[CONFIG] USE_CLOUD_LLM env='{_cloud_env}' -> {USE_CLOUD_LLM}")
+# Auto-detect cloud mode: if TOGETHER_API_KEY is set, we're in cloud mode
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
+USE_CLOUD_LLM = bool(TOGETHER_API_KEY)  # True if API key is set
+print(f"[CONFIG] USE_CLOUD_LLM={USE_CLOUD_LLM} (TOGETHER_API_KEY={'set' if TOGETHER_API_KEY else 'not set'})")
 TOGETHER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
 TOGETHER_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # 384 dim to match existing index
 
