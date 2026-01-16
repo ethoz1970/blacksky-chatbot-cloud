@@ -27,6 +27,13 @@
           </svg>
           Sign in with Google
         </div>
+        <div class="avatar-dropdown-item local-signin" id="localSignIn">
+          <svg width="18" height="18" viewBox="0 0 24 24" style="margin-right: 8px;" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          Sign in with Username
+        </div>
         <div class="avatar-dropdown-item" id="softSignIn">Sign In</div>
         <div class="avatar-dropdown-item" id="dashboardBtn" style="display: none;">My Dashboard</div>
         <div class="avatar-dropdown-item" id="signOut" style="display: none;">Sign Out</div>
@@ -79,6 +86,32 @@
       <button class="slideout-close" id="slideoutClose">×</button>
     </div>
     <div class="slideout-content" id="slideoutContent">
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="auth-modal-overlay" id="authModalOverlay"></div>
+  <div class="auth-modal" id="authModal">
+    <div class="auth-modal-header">
+      <h2 id="authModalTitle">Sign In</h2>
+      <button class="auth-modal-close" id="authModalClose">&times;</button>
+    </div>
+    <form id="authForm">
+      <div class="auth-form-group">
+        <input type="text" id="authUsername" class="auth-input" placeholder="Username" required autocomplete="username">
+      </div>
+      <div class="auth-form-group" id="authEmailGroup" style="display: none;">
+        <input type="email" id="authEmail" class="auth-input" placeholder="Email" autocomplete="email">
+      </div>
+      <div class="auth-form-group">
+        <input type="password" id="authPassword" class="auth-input" placeholder="Password" required autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <button type="submit" class="auth-submit" id="authSubmit">Sign In</button>
+    </form>
+    <div class="auth-toggle">
+      <span id="authToggleText">Need an account?</span>
+      <a href="#" id="authToggleLink">Register</a>
     </div>
   </div>
 

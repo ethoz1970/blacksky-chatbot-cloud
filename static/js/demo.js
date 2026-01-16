@@ -87,9 +87,29 @@ const avatarBtn = document.getElementById('avatarBtn');
 const avatarDropdown = document.getElementById('avatarDropdown');
 const avatarGreeting = document.getElementById('avatarGreeting');
 const googleSignInBtn = document.getElementById('googleSignIn');
+const localSignInBtn = document.getElementById('localSignIn');
 const softSignInBtn = document.getElementById('softSignIn');
 const dashboardBtn = document.getElementById('dashboardBtn');
 const signOutBtn = document.getElementById('signOut');
+
+// Auth modal elements
+const authModal = document.getElementById('authModal');
+const authModalOverlay = document.getElementById('authModalOverlay');
+const authModalClose = document.getElementById('authModalClose');
+const authForm = document.getElementById('authForm');
+const authModalTitle = document.getElementById('authModalTitle');
+const authUsername = document.getElementById('authUsername');
+const authEmail = document.getElementById('authEmail');
+const authEmailGroup = document.getElementById('authEmailGroup');
+const authPassword = document.getElementById('authPassword');
+const authError = document.getElementById('authError');
+const authSubmit = document.getElementById('authSubmit');
+const authToggleText = document.getElementById('authToggleText');
+const authToggleLink = document.getElementById('authToggleLink');
+
+// Auth modal state
+let authMode = 'signin'; // 'signin' or 'register'
+let isLocalAuth = false;
 
 // Update avatar display based on current user
 function updateAvatarUI() {
@@ -107,6 +127,26 @@ function updateAvatarUI() {
 
     // Show sign out and dashboard, hide sign in options
     googleSignInBtn.style.display = 'none';
+    localSignInBtn.style.display = 'none';
+    softSignInBtn.style.display = 'none';
+    dashboardBtn.style.display = 'block';
+    signOutBtn.style.display = 'block';
+  } else if (isLocalAuth) {
+    // Local authenticated user (username/password)
+    avatarBtn.textContent = currentUserName ? currentUserName.charAt(0).toUpperCase() : '?';
+    avatarBtn.innerHTML = currentUserName ? currentUserName.charAt(0).toUpperCase() : '?';
+    avatarBtn.classList.add('known');
+    avatarBtn.classList.remove('google-auth');
+
+    let html = '<span class="user-name">' + currentUserName + '<span class="verified-badge">✓</span></span>';
+    if (currentUserEmail) {
+      html += '<span class="user-detail"><span class="user-detail-label">Email:</span>' + currentUserEmail + '</span>';
+    }
+    avatarGreeting.innerHTML = html;
+
+    // Show sign out and dashboard, hide sign in options
+    googleSignInBtn.style.display = 'none';
+    localSignInBtn.style.display = 'none';
     softSignInBtn.style.display = 'none';
     dashboardBtn.style.display = 'block';
     signOutBtn.style.display = 'block';
@@ -129,8 +169,9 @@ function updateAvatarUI() {
     }
     avatarGreeting.innerHTML = html;
 
-    // Soft login can upgrade to Google, view dashboard, or sign out
+    // Soft login can upgrade to Google or local, view dashboard, or sign out
     googleSignInBtn.style.display = 'flex';
+    localSignInBtn.style.display = 'flex';
     softSignInBtn.style.display = 'none';
     dashboardBtn.style.display = 'block';
     signOutBtn.style.display = 'block';
@@ -142,8 +183,9 @@ function updateAvatarUI() {
     avatarBtn.classList.remove('google-auth');
     avatarGreeting.textContent = 'Guest';
 
-    // Show both sign in options, hide dashboard and sign out
+    // Show all sign in options, hide dashboard and sign out
     googleSignInBtn.style.display = 'flex';
+    localSignInBtn.style.display = 'flex';
     softSignInBtn.style.display = 'block';
     dashboardBtn.style.display = 'none';
     signOutBtn.style.display = 'none';
@@ -170,10 +212,117 @@ googleSignInBtn.addEventListener('click', () => {
   window.location.href = `${API_HOST}/auth/google/login?user_id=${userId}`;
 });
 
+// Handle local sign in (username/password)
+localSignInBtn.addEventListener('click', () => {
+  avatarDropdown.classList.remove('active');
+  showAuthModal('signin');
+});
+
 // Handle soft sign in (conversational)
 softSignInBtn.addEventListener('click', () => {
   avatarDropdown.classList.remove('active');
   signIn();
+});
+
+// Auth modal functions
+function showAuthModal(mode) {
+  authMode = mode;
+  authError.textContent = '';
+  authUsername.value = '';
+  authPassword.value = '';
+  authEmail.value = '';
+
+  if (mode === 'register') {
+    authModalTitle.textContent = 'Create Account';
+    authEmailGroup.style.display = 'block';
+    authEmail.required = true;
+    authSubmit.textContent = 'Create Account';
+    authToggleText.textContent = 'Already have an account?';
+    authToggleLink.textContent = 'Sign In';
+  } else {
+    authModalTitle.textContent = 'Sign In';
+    authEmailGroup.style.display = 'none';
+    authEmail.required = false;
+    authSubmit.textContent = 'Sign In';
+    authToggleText.textContent = 'Need an account?';
+    authToggleLink.textContent = 'Register';
+  }
+
+  authModal.classList.add('active');
+  authModalOverlay.classList.add('active');
+  authUsername.focus();
+}
+
+function hideAuthModal() {
+  authModal.classList.remove('active');
+  authModalOverlay.classList.remove('active');
+}
+
+// Auth modal event handlers
+authModalClose.addEventListener('click', hideAuthModal);
+authModalOverlay.addEventListener('click', hideAuthModal);
+
+authToggleLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  showAuthModal(authMode === 'signin' ? 'register' : 'signin');
+});
+
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  authError.textContent = '';
+  authSubmit.disabled = true;
+
+  const username = authUsername.value.trim();
+  const password = authPassword.value;
+  const email = authEmail.value.trim();
+
+  try {
+    const endpoint = authMode === 'register' ? '/auth/register' : '/auth/login';
+    const body = {
+      username,
+      password,
+      current_user_id: userId
+    };
+    if (authMode === 'register') {
+      body.email = email;
+    }
+
+    const res = await fetch(`${API_HOST}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      authError.textContent = data.detail || 'Authentication failed';
+      authSubmit.disabled = false;
+      return;
+    }
+
+    // Success - store token and update state
+    localStorage.setItem('blacksky_auth_token', data.token);
+    googleAuthToken = data.token;
+    userId = data.user_id;
+    setCookie('blacksky_user_id', userId, 30);
+    currentUserName = data.name;
+    currentUserEmail = data.email;
+    isLocalAuth = true;
+    isGoogleAuth = false;
+
+    hideAuthModal();
+    updateAvatarUI();
+
+    // Reset conversation for the authenticated user
+    conversationMessages = [];
+    showWelcomeMessage();
+
+  } catch (err) {
+    console.error('Auth error:', err);
+    authError.textContent = 'Connection error. Please try again.';
+    authSubmit.disabled = false;
+  }
 });
 
 // Handle sign out
@@ -437,11 +586,12 @@ window.saveProfileChanges = async function() {
 };
 
 function signOut() {
-  // Clear Google auth state
+  // Clear auth state (both Google and local)
   localStorage.removeItem('blacksky_auth_token');
   googleAuthToken = null;
   googleUserPicture = null;
   isGoogleAuth = false;
+  isLocalAuth = false;
   // Generate new user ID
   userId = generateUUID();
   setCookie('blacksky_user_id', userId, 30);
@@ -577,7 +727,7 @@ async function fetchUserContext() {
 }
 
 // Verify Google auth token
-async function verifyGoogleAuth(token) {
+async function verifyAuthToken(token) {
   try {
     const res = await fetch(`${API_HOST}/auth/verify`, {
       method: 'POST',
@@ -587,13 +737,23 @@ async function verifyGoogleAuth(token) {
     if (res.ok) {
       const data = await res.json();
       if (data.valid) {
-        // Update user state with Google auth info
+        // Update user state with auth info
         userId = data.user_id;
         setCookie('blacksky_user_id', userId, 30);
         currentUserName = data.name;
         currentUserEmail = data.email;
-        googleUserPicture = data.picture;
-        isGoogleAuth = true;
+
+        // Set auth type based on response
+        if (data.auth_method === 'google') {
+          googleUserPicture = data.picture;
+          isGoogleAuth = true;
+          isLocalAuth = false;
+        } else if (data.auth_method === 'local') {
+          googleUserPicture = null;
+          isGoogleAuth = false;
+          isLocalAuth = true;
+        }
+
         updateAvatarUI();
         return true;
       }
@@ -604,7 +764,14 @@ async function verifyGoogleAuth(token) {
   // Invalid token - clear it
   localStorage.removeItem('blacksky_auth_token');
   googleAuthToken = null;
+  isGoogleAuth = false;
+  isLocalAuth = false;
   return false;
+}
+
+// Alias for backwards compatibility
+async function verifyGoogleAuth(token) {
+  return verifyAuthToken(token);
 }
 
 // Check for auth token in URL (OAuth callback redirect)

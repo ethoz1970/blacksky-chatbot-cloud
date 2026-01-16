@@ -875,3 +875,155 @@ textarea::placeholder {
   border-color: #666;
   color: #aaa;
 }
+
+/* Auth Modal */
+.auth-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  z-index: 1000;
+}
+
+.auth-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.auth-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 30px;
+  width: 90%;
+  max-width: 400px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+  z-index: 1001;
+}
+
+.auth-modal.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.auth-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.auth-modal-header h2 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.auth-modal-close {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.auth-modal-close:hover {
+  color: #fff;
+}
+
+.auth-form-group {
+  margin-bottom: 16px;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.auth-input::placeholder {
+  color: #666;
+}
+
+.auth-error {
+  color: #f66;
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+  min-height: 20px;
+}
+
+.auth-submit {
+  width: 100%;
+  padding: 12px;
+  background: #2a4a2a;
+  border: none;
+  border-radius: 4px;
+  color: #6f6;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.auth-submit:hover {
+  background: #3a5a3a;
+}
+
+.auth-submit:disabled {
+  background: #1a2a1a;
+  color: #4a4;
+  cursor: not-allowed;
+}
+
+.auth-toggle {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.auth-toggle a {
+  color: #4a9eff;
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.auth-toggle a:hover {
+  text-decoration: underline;
+}
+
+/* Local signin button in dropdown */
+.local-signin {
+  display: flex;
+  align-items: center;
+}
+
+.local-signin svg {
+  color: #888;
+}

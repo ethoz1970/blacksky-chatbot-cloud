@@ -38,7 +38,11 @@ class User(Base):
     google_email = Column(String(255), nullable=True)
     google_name = Column(String(255), nullable=True)
     google_picture = Column(String(500), nullable=True)
-    auth_method = Column(String(20), default="soft")  # "soft" or "google"
+    auth_method = Column(String(20), default="soft")  # "soft", "google", or "local"
+
+    # Local auth fields (username/password)
+    username = Column(String(100), nullable=True, unique=True, index=True)
+    password_hash = Column(String(255), nullable=True)
 
     conversations = relationship("Conversation", back_populates="user")
 
@@ -315,6 +319,115 @@ def link_google_account(user_id: str, google_id: str, google_email: str,
         print(f"Error linking Google account: {e}")
         session.rollback()
         return None
+    finally:
+        session.close()
+
+
+def create_local_user(user_id: str, username: str, email: str, password_hash: str) -> Optional[dict]:
+    """Create a new user with username/password auth."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = User(
+            id=user_id,
+            username=username,
+            email=email,
+            password_hash=password_hash,
+            name=username,  # Use username as display name initially
+            auth_method="local"
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        return {
+            "id": str(user.id),
+            "username": user.username,
+            "name": user.name,
+            "email": user.email,
+            "auth_method": user.auth_method
+        }
+    except Exception as e:
+        print(f"Error creating local user: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
+def get_user_by_username(username: str) -> Optional[dict]:
+    """Find user by username for login."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = session.query(User).filter(User.username == username).first()
+
+        if user is None:
+            return None
+
+        return {
+            "id": str(user.id),
+            "username": user.username,
+            "name": user.name,
+            "email": user.email,
+            "password_hash": user.password_hash,
+            "auth_method": user.auth_method
+        }
+    except Exception as e:
+        print(f"Error getting user by username: {e}")
+        return None
+    finally:
+        session.close()
+
+
+def migrate_user_data(from_user_id: str, to_user_id: str) -> bool:
+    """Move conversations from anonymous/soft user to authenticated user.
+
+    Updates all conversations to point to the new user ID,
+    then deletes the old user record.
+    """
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        # Check if source user exists and has conversations
+        from_user = session.query(User).filter(User.id == from_user_id).first()
+        if from_user is None:
+            return True  # Nothing to migrate
+
+        # Update all conversations to point to new user
+        session.query(Conversation).filter(
+            Conversation.user_id == from_user_id
+        ).update({Conversation.user_id: to_user_id})
+
+        # Copy over any user info that might be useful
+        to_user = session.query(User).filter(User.id == to_user_id).first()
+        if to_user:
+            # Preserve any info from the anonymous session
+            if from_user.name and not to_user.name:
+                to_user.name = from_user.name
+            if from_user.email and not to_user.email:
+                to_user.email = from_user.email
+            if from_user.phone and not to_user.phone:
+                to_user.phone = from_user.phone
+            if from_user.company and not to_user.company:
+                to_user.company = from_user.company
+
+        # Delete the old user record
+        session.delete(from_user)
+        session.commit()
+
+        print(f"[DB] Migrated data from {from_user_id} to {to_user_id}")
+        return True
+    except Exception as e:
+        print(f"Error migrating user data: {e}")
+        session.rollback()
+        return False
     finally:
         session.close()
 

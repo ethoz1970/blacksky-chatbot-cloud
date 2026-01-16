@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
 import jwt
+from passlib.hash import bcrypt
 
 from chatbot import BlackskyChatbot
 from config import (
@@ -30,7 +31,8 @@ from database import (
     get_user_context, get_leads, lookup_users_by_name, link_users,
     get_lead_details, update_lead_status, update_lead_notes, get_user_conversations,
     delete_user, get_analytics, get_user_by_google_id, create_google_user, link_google_account,
-    get_user_dashboard, get_all_messages
+    get_user_dashboard, get_all_messages,
+    create_local_user, get_user_by_username, migrate_user_data
 )
 
 # Paths
@@ -156,14 +158,22 @@ if GOOGLE_CLIENT_ID:
 
 
 # JWT token utilities
-def create_auth_token(user_id: str, google_id: str) -> str:
-    """Create JWT token for authenticated session."""
+def create_auth_token(user_id: str, auth_type: str = 'local', google_id: str = None) -> str:
+    """Create JWT token for authenticated session.
+
+    Args:
+        user_id: The user's ID
+        auth_type: 'google' or 'local'
+        google_id: Google ID (only for Google auth)
+    """
     payload = {
         'user_id': user_id,
-        'google_id': google_id,
+        'auth_type': auth_type,
         'exp': datetime.utcnow() + timedelta(days=30),
         'iat': datetime.utcnow()
     }
+    if google_id:
+        payload['google_id'] = google_id
     return jwt.encode(payload, SESSION_SECRET_KEY, algorithm='HS256')
 
 
@@ -1473,7 +1483,7 @@ async def google_callback(request: Request):
                 )
 
         # Create auth token
-        auth_token = create_auth_token(user_id, google_id)
+        auth_token = create_auth_token(user_id, auth_type='google', google_id=google_id)
 
         # Redirect back to demo page with token
         return RedirectResponse(
@@ -1497,6 +1507,19 @@ class AuthTokenRequest(BaseModel):
     token: str
 
 
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    current_user_id: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+    current_user_id: Optional[str] = None
+
+
 @app.post("/auth/verify")
 async def verify_auth_token(request: AuthTokenRequest):
     """Verify auth token and return user info."""
@@ -1506,19 +1529,32 @@ async def verify_auth_token(request: AuthTokenRequest):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     user_id = payload.get('user_id')
-    google_id = payload.get('google_id')
+    auth_type = payload.get('auth_type', 'google')  # Default to google for old tokens
 
-    # Get full user info
-    user = get_user_by_google_id(google_id)
-    if user:
-        return {
-            "valid": True,
-            "user_id": user['id'],
-            "name": user['name'],
-            "email": user['email'],
-            "picture": user['google_picture'],
-            "auth_method": user['auth_method']
-        }
+    if auth_type == 'google':
+        google_id = payload.get('google_id')
+        user = get_user_by_google_id(google_id)
+        if user:
+            return {
+                "valid": True,
+                "user_id": user['id'],
+                "name": user['name'],
+                "email": user['email'],
+                "picture": user['google_picture'],
+                "auth_method": user['auth_method']
+            }
+    else:
+        # Local auth - look up user by ID
+        context = get_user_context(user_id)
+        if context:
+            return {
+                "valid": True,
+                "user_id": context['user_id'],
+                "name": context['name'],
+                "email": context['email'],
+                "picture": None,
+                "auth_method": context['auth_method']
+            }
 
     raise HTTPException(status_code=404, detail="User not found")
 
@@ -1528,6 +1564,88 @@ async def logout(request: Request):
     """Log out user (clear session)."""
     request.session.clear()
     return {"status": "logged_out"}
+
+
+@app.post("/auth/register")
+async def register(request: RegisterRequest):
+    """Register new user with username/password."""
+    # Validate username
+    if len(request.username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if len(request.username) > 50:
+        raise HTTPException(status_code=400, detail="Username too long")
+    if not re.match(r'^[a-zA-Z0-9_]+$', request.username):
+        raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, and underscores")
+
+    # Validate email format
+    if not re.match(r'^[^@]+@[^@]+\.[^@]+$', request.email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+
+    # Validate password
+    if len(request.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    # Check if username already exists
+    existing_user = get_user_by_username(request.username)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    # Hash password
+    password_hash = bcrypt.hash(request.password)
+
+    # Create new user
+    user_id = str(uuid.uuid4())
+    user = create_local_user(user_id, request.username, request.email, password_hash)
+
+    if not user:
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
+    # Migrate data from anonymous user if provided
+    if request.current_user_id and request.current_user_id != user_id:
+        migrate_user_data(request.current_user_id, user_id)
+
+    # Create auth token
+    auth_token = create_auth_token(user_id, auth_type='local')
+
+    return {
+        "token": auth_token,
+        "user_id": user['id'],
+        "username": user['username'],
+        "name": user['name'],
+        "email": user['email'],
+        "auth_method": "local"
+    }
+
+
+@app.post("/auth/login")
+async def login(request: LoginRequest):
+    """Login with username/password."""
+    # Find user
+    user = get_user_by_username(request.username)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    # Verify password
+    if not user.get('password_hash') or not bcrypt.verify(request.password, user['password_hash']):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    user_id = user['id']
+
+    # Migrate data from anonymous user if provided
+    if request.current_user_id and request.current_user_id != user_id:
+        migrate_user_data(request.current_user_id, user_id)
+
+    # Create auth token
+    auth_token = create_auth_token(user_id, auth_type='local')
+
+    return {
+        "token": auth_token,
+        "user_id": user_id,
+        "username": user['username'],
+        "name": user['name'],
+        "email": user['email'],
+        "auth_method": "local"
+    }
 
 
 def calculate_lead_score(messages: list) -> int:
