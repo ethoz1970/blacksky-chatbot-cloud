@@ -1610,8 +1610,9 @@ async def register(request: RegisterRequest):
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already taken")
 
-        # Hash password (truncate to 72 chars - bcrypt limit)
-        password_hash = bcrypt.hash(request.password[:72])
+        # Hash password (truncate to 72 bytes - bcrypt limit)
+        password_bytes = request.password.encode('utf-8')[:72]
+        password_hash = bcrypt.hash(password_bytes)
 
         # Create new user
         user_id = str(uuid.uuid4())
@@ -1653,8 +1654,9 @@ async def login(request: LoginRequest):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
-        # Verify password (truncate to 72 chars - bcrypt limit)
-        if not user.get('password_hash') or not bcrypt.verify(request.password[:72], user['password_hash']):
+        # Verify password (truncate to 72 bytes - bcrypt limit)
+        password_bytes = request.password.encode('utf-8')[:72]
+        if not user.get('password_hash') or not bcrypt.verify(password_bytes, user['password_hash']):
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         user_id = user['id']
