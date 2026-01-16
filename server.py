@@ -586,6 +586,9 @@ async def admin_dashboard(password: str = Query(None)):
 
     # Build HTML table rows
     rows = ""
+    # Track signal counts for analytics
+    signal_counts = {"urgent": 0, "decision_maker": 0, "budget_ready": 0, "pricing_discussed": 0}
+
     for lead in leads:
         score = lead.get('lead_score', 1)
         score_color = "#4a4" if score >= 3 else "#aa4" if score >= 2 else "#666"
@@ -598,9 +601,33 @@ async def admin_dashboard(password: str = Query(None)):
         email = lead.get('email') or ''
         email_btn = f'<a href="mailto:{email}" class="action-btn" title="Send email">@</a>' if email else ''
 
+        # Generate signal badges from interests
+        interests = lead.get('interests', [])
+        signal_badges = []
+        signals_data = []
+        if 'urgent' in interests:
+            signal_badges.append('<span class="badge badge-urgent">URGENT</span>')
+            signals_data.append('urgent')
+            signal_counts['urgent'] += 1
+        if 'decision_maker' in interests:
+            signal_badges.append('<span class="badge badge-dm">DM</span>')
+            signals_data.append('decision_maker')
+            signal_counts['decision_maker'] += 1
+        if 'budget_ready' in interests:
+            signal_badges.append('<span class="badge badge-budget">BUDGET</span>')
+            signals_data.append('budget_ready')
+            signal_counts['budget_ready'] += 1
+        if 'pricing_discussed' in interests:
+            signal_badges.append('<span class="badge badge-pricing">PRICING</span>')
+            signals_data.append('pricing_discussed')
+            signal_counts['pricing_discussed'] += 1
+        signals_html = ' '.join(signal_badges) if signal_badges else '<span style="color:#444">-</span>'
+        signals_data_str = ','.join(signals_data)
+
         rows += f"""
-            <tr class="lead-row" data-id="{lead['id']}" data-name="{lead['name']}" data-email="{email}" data-company="{lead.get('company') or ''}" data-status="{status}" data-score="{score}">
+            <tr class="lead-row" data-id="{lead['id']}" data-name="{lead['name']}" data-email="{email}" data-company="{lead.get('company') or ''}" data-status="{status}" data-score="{score}" data-signals="{signals_data_str}">
                 <td style="color: {score_color}; font-weight: bold;">{score}</td>
+                <td class="signals-cell">{signals_html}</td>
                 <td class="clickable" onclick="showConversations('{lead['id']}')">{lead['name']}</td>
                 <td>{email_btn} {email or '-'}</td>
                 <td>{lead.get('company') or '-'}</td>
@@ -672,6 +699,17 @@ async def admin_dashboard(password: str = Query(None)):
                 .message-role {{ font-size: 0.75rem; color: #666; margin-bottom: 4px; }}
                 .notes-textarea {{ width: 100%; height: 150px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #333; padding: 10px; font-family: monospace; border-radius: 4px; resize: vertical; }}
                 .conversation-date {{ color: #666; font-size: 0.8rem; margin-top: 20px; padding-top: 10px; border-top: 1px solid #333; }}
+                .badge {{ display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; margin-right: 3px; }}
+                .badge-urgent {{ background: #dc3545; color: white; }}
+                .badge-dm {{ background: #007bff; color: white; }}
+                .badge-budget {{ background: #28a745; color: white; }}
+                .badge-pricing {{ background: #fd7e14; color: white; }}
+                .signals-cell {{ min-width: 120px; }}
+                .lead-summary {{ background: #1a2a1a; border: 1px solid #2a4a2a; border-radius: 6px; padding: 15px; margin-bottom: 20px; }}
+                .lead-summary-title {{ color: #6d6; font-size: 0.9rem; margin-bottom: 10px; font-weight: bold; }}
+                .lead-summary-row {{ display: flex; gap: 20px; flex-wrap: wrap; }}
+                .lead-summary-item {{ color: #aaa; font-size: 0.85rem; }}
+                .lead-summary-item strong {{ color: #e0e0e0; }}
             </style>
         </head>
         <body>
@@ -716,6 +754,19 @@ async def admin_dashboard(password: str = Query(None)):
                     <div class="stat-value">{this_week}</div>
                     <div class="stat-label">This Week</div>
                 </div>
+                <div style="border-left: 1px solid #333; height: 40px; margin: 0 10px;"></div>
+                <div class="stat">
+                    <div class="stat-value" style="color: #dc3545;">{signal_counts['urgent']}</div>
+                    <div class="stat-label">Urgent</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" style="color: #007bff;">{signal_counts['decision_maker']}</div>
+                    <div class="stat-label">Decision-Makers</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" style="color: #28a745;">{signal_counts['budget_ready']}</div>
+                    <div class="stat-label">Budget Ready</div>
+                </div>
             </div>
 
             <!-- Search & Filters -->
@@ -735,6 +786,13 @@ async def admin_dashboard(password: str = Query(None)):
                     <option value="2">Score 2+</option>
                     <option value="1">Score 1+</option>
                 </select>
+                <select id="signalFilter" class="filter-input" onchange="filterTable()">
+                    <option value="">All Signals</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="decision_maker">Decision-Makers</option>
+                    <option value="budget_ready">Budget Ready</option>
+                    <option value="pricing_discussed">Pricing Discussed</option>
+                </select>
                 <span id="resultCount" style="color: #666; font-size: 0.85rem;"></span>
             </div>
 
@@ -742,6 +800,7 @@ async def admin_dashboard(password: str = Query(None)):
                 <thead>
                     <tr>
                         <th>Score</th>
+                        <th>Signals</th>
                         <th>Name</th>
                         <th>Email</th>
                         <th>Company</th>
@@ -752,7 +811,7 @@ async def admin_dashboard(password: str = Query(None)):
                     </tr>
                 </thead>
                 <tbody id="leadsTable">
-                    {rows if rows else '<tr><td colspan="8" style="color: #666; text-align: center;">No leads yet. Start chatting!</td></tr>'}
+                    {rows if rows else '<tr><td colspan="9" style="color: #666; text-align: center;">No leads yet. Start chatting!</td></tr>'}
                 </tbody>
             </table>
 
@@ -790,6 +849,7 @@ async def admin_dashboard(password: str = Query(None)):
                     const search = document.getElementById('searchInput').value.toLowerCase();
                     const statusFilter = document.getElementById('statusFilter').value;
                     const scoreFilter = parseInt(document.getElementById('scoreFilter').value) || 0;
+                    const signalFilter = document.getElementById('signalFilter').value;
 
                     const rows = document.querySelectorAll('#leadsTable .lead-row');
                     let visibleCount = 0;
@@ -800,12 +860,14 @@ async def admin_dashboard(password: str = Query(None)):
                         const company = row.dataset.company.toLowerCase();
                         const status = row.dataset.status;
                         const score = parseInt(row.dataset.score);
+                        const signals = row.dataset.signals || '';
 
                         const matchesSearch = !search || name.includes(search) || email.includes(search) || company.includes(search);
                         const matchesStatus = !statusFilter || status === statusFilter;
                         const matchesScore = !scoreFilter || score >= scoreFilter;
+                        const matchesSignal = !signalFilter || signals.includes(signalFilter);
 
-                        if (matchesSearch && matchesStatus && matchesScore) {{
+                        if (matchesSearch && matchesStatus && matchesScore && matchesSignal) {{
                             row.classList.remove('hidden');
                             visibleCount++;
                         }} else {{
@@ -838,9 +900,39 @@ async def admin_dashboard(password: str = Query(None)):
                     document.getElementById('convModalTitle').textContent = data.name + "'s Conversations";
 
                     let html = '';
+
+                    // Build lead summary header
                     if (data.conversations && data.conversations.length > 0) {{
+                        const latestConv = data.conversations[0];
+                        const score = latestConv.lead_score || 1;
+                        const interests = latestConv.interests || [];
+
+                        // Separate technical interests from buying signals
+                        const buyingSignals = ['urgent', 'decision_maker', 'budget_ready', 'pricing_discussed'];
+                        const signals = interests.filter(i => buyingSignals.includes(i));
+                        const techInterests = interests.filter(i => !buyingSignals.includes(i));
+
+                        // Build signal badges
+                        let signalBadges = '';
+                        if (signals.includes('urgent')) signalBadges += '<span class="badge badge-urgent">URGENT</span>';
+                        if (signals.includes('decision_maker')) signalBadges += '<span class="badge badge-dm">DM</span>';
+                        if (signals.includes('budget_ready')) signalBadges += '<span class="badge badge-budget">BUDGET</span>';
+                        if (signals.includes('pricing_discussed')) signalBadges += '<span class="badge badge-pricing">PRICING</span>';
+
+                        html += `
+                            <div class="lead-summary">
+                                <div class="lead-summary-title">Lead Intelligence</div>
+                                <div class="lead-summary-row">
+                                    <div class="lead-summary-item"><strong>Score:</strong> ${{score}}/5</div>
+                                    <div class="lead-summary-item"><strong>Signals:</strong> ${{signalBadges || '<span style="color:#666">None</span>'}}</div>
+                                    <div class="lead-summary-item"><strong>Interests:</strong> ${{techInterests.length > 0 ? techInterests.join(', ') : '<span style="color:#666">None</span>'}}</div>
+                                    <div class="lead-summary-item"><strong>Conversations:</strong> ${{data.conversations.length}}</div>
+                                </div>
+                            </div>
+                        `;
+
                         for (const conv of data.conversations) {{
-                            html += `<div class="conversation-date">Conversation on ${{conv.created_at ? conv.created_at.slice(0,10) : 'Unknown'}}</div>`;
+                            html += `<div class="conversation-date">Conversation on ${{conv.created_at ? conv.created_at.slice(0,10) : 'Unknown'}} (Score: ${{conv.lead_score || 1}})</div>`;
                             if (conv.messages && conv.messages.length > 0) {{
                                 for (const msg of conv.messages) {{
                                     const roleClass = msg.role === 'user' ? 'message-user' : 'message-assistant';
