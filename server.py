@@ -94,14 +94,17 @@ def run_migrations():
             pass  # Index may already exist
 
         # Local auth columns
+        print("Adding username column for local auth...")
         session.execute(text("""
             ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)
         """))
+        print("Adding password_hash column for local auth...")
         session.execute(text("""
             ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)
         """))
 
         # Add unique index on username (ignore if exists)
+        print("Adding unique index on username...")
         try:
             session.execute(text("""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)
@@ -110,7 +113,7 @@ def run_migrations():
             pass  # Index may already exist
 
         session.commit()
-        print("Database migrations complete.")
+        print("Database migrations complete - all columns added successfully.")
     except Exception as e:
         print(f"Migration error (may be normal if columns exist): {e}")
         session.rollback()
@@ -1585,83 +1588,99 @@ async def logout(request: Request):
 @app.post("/auth/register")
 async def register(request: RegisterRequest):
     """Register new user with username/password."""
-    # Validate username
-    if len(request.username) < 3:
-        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
-    if len(request.username) > 50:
-        raise HTTPException(status_code=400, detail="Username too long")
-    if not re.match(r'^[a-zA-Z0-9_]+$', request.username):
-        raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, and underscores")
+    try:
+        # Validate username
+        if len(request.username) < 3:
+            raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+        if len(request.username) > 50:
+            raise HTTPException(status_code=400, detail="Username too long")
+        if not re.match(r'^[a-zA-Z0-9_]+$', request.username):
+            raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, and underscores")
 
-    # Validate email format
-    if not re.match(r'^[^@]+@[^@]+\.[^@]+$', request.email):
-        raise HTTPException(status_code=400, detail="Invalid email format")
+        # Validate email format
+        if not re.match(r'^[^@]+@[^@]+\.[^@]+$', request.email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
 
-    # Validate password
-    if len(request.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        # Validate password
+        if len(request.password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
-    # Check if username already exists
-    existing_user = get_user_by_username(request.username)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already taken")
+        # Check if username already exists
+        existing_user = get_user_by_username(request.username)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already taken")
 
-    # Hash password
-    password_hash = bcrypt.hash(request.password)
+        # Hash password
+        password_hash = bcrypt.hash(request.password)
 
-    # Create new user
-    user_id = str(uuid.uuid4())
-    user = create_local_user(user_id, request.username, request.email, password_hash)
+        # Create new user
+        user_id = str(uuid.uuid4())
+        user = create_local_user(user_id, request.username, request.email, password_hash)
 
-    if not user:
-        raise HTTPException(status_code=500, detail="Failed to create user")
+        if not user:
+            raise HTTPException(status_code=500, detail="Failed to create user - database error")
 
-    # Migrate data from anonymous user if provided
-    if request.current_user_id and request.current_user_id != user_id:
-        migrate_user_data(request.current_user_id, user_id)
+        # Migrate data from anonymous user if provided
+        if request.current_user_id and request.current_user_id != user_id:
+            migrate_user_data(request.current_user_id, user_id)
 
-    # Create auth token
-    auth_token = create_auth_token(user_id, auth_type='local')
+        # Create auth token
+        auth_token = create_auth_token(user_id, auth_type='local')
 
-    return {
-        "token": auth_token,
-        "user_id": user['id'],
-        "username": user['username'],
-        "name": user['name'],
-        "email": user['email'],
-        "auth_method": "local"
-    }
+        return {
+            "token": auth_token,
+            "user_id": user['id'],
+            "username": user['username'],
+            "name": user['name'],
+            "email": user['email'],
+            "auth_method": "local"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Register error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
 @app.post("/auth/login")
 async def login(request: LoginRequest):
     """Login with username/password."""
-    # Find user
-    user = get_user_by_username(request.username)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+    try:
+        # Find user
+        user = get_user_by_username(request.username)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    # Verify password
-    if not user.get('password_hash') or not bcrypt.verify(request.password, user['password_hash']):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        # Verify password
+        if not user.get('password_hash') or not bcrypt.verify(request.password, user['password_hash']):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    user_id = user['id']
+        user_id = user['id']
 
-    # Migrate data from anonymous user if provided
-    if request.current_user_id and request.current_user_id != user_id:
-        migrate_user_data(request.current_user_id, user_id)
+        # Migrate data from anonymous user if provided
+        if request.current_user_id and request.current_user_id != user_id:
+            migrate_user_data(request.current_user_id, user_id)
 
-    # Create auth token
-    auth_token = create_auth_token(user_id, auth_type='local')
+        # Create auth token
+        auth_token = create_auth_token(user_id, auth_type='local')
 
-    return {
-        "token": auth_token,
-        "user_id": user_id,
-        "username": user['username'],
-        "name": user['name'],
-        "email": user['email'],
-        "auth_method": "local"
-    }
+        return {
+            "token": auth_token,
+            "user_id": user_id,
+            "username": user['username'],
+            "name": user['name'],
+            "email": user['email'],
+            "auth_method": "local"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Login error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 
 def calculate_lead_score(messages: list) -> int:
