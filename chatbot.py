@@ -54,6 +54,23 @@ class BlackskyChatbot:
             if user_context.get("last_interests"):
                 parts.append(f"Previous interests: {', '.join(user_context['last_interests'])}")
 
+            # Add lead intelligence based on previous engagement
+            lead_score = user_context.get("last_lead_score", 1)
+            conv_count = user_context.get("conversation_count", 1)
+            has_contact = user_context.get("email") or user_context.get("phone")
+
+            if lead_score >= 3:
+                # High-value returning lead
+                interests = user_context.get("last_interests", [])
+                interest_str = ', '.join(interests) if interests else "your services"
+                parts.append(f"\nLEAD INTELLIGENCE: This user previously showed strong interest in {interest_str}.")
+                parts.append(f"They scored {lead_score}/5 on intent signals.")
+                parts.append("Consider this a warm lead — be helpful but look for closing opportunities.")
+            elif conv_count > 1 and not has_contact:
+                # Multiple visits but no contact info
+                parts.append(f"\nLEAD INTELLIGENCE: This user has visited {conv_count} times but hasn't provided contact info.")
+                parts.append("Focus on understanding their needs before asking for info.")
+
         # Add potential matches for verification
         if potential_matches and len(potential_matches) > 0:
             parts.append("\nPOTENTIAL MATCHES (user just provided their name - verify their identity):")

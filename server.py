@@ -1439,12 +1439,23 @@ async def logout(request: Request):
 
 
 def calculate_lead_score(messages: list) -> int:
-    """Score 1-5 based on intent signals."""
+    """Score 1-5 based on intent signals.
+
+    Scoring factors:
+    - High intent phrases (pricing, hire, etc.) → base score 4
+    - Medium intent phrases (services, portfolio) → base score 2
+    - Urgency signals → +1
+    - Decision-maker language → +1
+    - Budget discussion → +1
+    - Provided name → +1
+    - Provided email → +1
+    - Tire-kicker signals → -1
+    """
     high_intent_phrases = [
         "pricing", "cost", "how much", "price",
         "availability", "schedule", "call", "meeting",
         "hire", "work with", "engagement", "contract",
-        "proposal", "quote", "budget", "rate"
+        "proposal", "quote", "rate"
     ]
 
     medium_intent_phrases = [
@@ -1453,17 +1464,69 @@ def calculate_lead_score(messages: list) -> int:
         "timeline", "how long", "project"
     ]
 
+    # Urgency signals - indicates time-sensitive need
+    urgency_phrases = [
+        "asap", "urgent", "urgently", "quickly", "this week", "this month",
+        "deadline", "right away", "immediately", "soon as possible",
+        "time sensitive", "rush", "fast track", "expedite"
+    ]
+
+    # Decision-maker signals - indicates authority to buy
+    decision_maker_phrases = [
+        "my team", "we need", "our company", "i'm the", "i am the",
+        "i lead", "my department", "we're looking", "our project",
+        "i manage", "i run", "i own", "my business", "our organization",
+        "we have budget", "i'm responsible", "my organization"
+    ]
+
+    # Budget signals - indicates financial readiness
+    budget_phrases = [
+        "budget", "funding", "approved", "allocated", "spend",
+        "thousand", "million", "investment", "pay", "afford"
+    ]
+
+    # Tire-kicker signals - indicates low buying intent
+    tire_kicker_phrases = [
+        "just curious", "just browsing", "homework", "research paper",
+        "student project", "learning about", "hypothetically",
+        "just wondering", "no budget", "maybe someday", "just looking",
+        "school project", "class assignment"
+    ]
+
     text = " ".join([m.get("content", "").lower() for m in messages if m.get("role") == "user"])
 
+    # Base score from intent level
     score = 1
     if any(phrase in text for phrase in high_intent_phrases):
         score = 4
     elif any(phrase in text for phrase in medium_intent_phrases):
         score = 2
 
+    # Boost for urgency signals
+    if any(phrase in text for phrase in urgency_phrases):
+        score = min(score + 1, 5)
+
+    # Boost for decision-maker language
+    if any(phrase in text for phrase in decision_maker_phrases):
+        score = min(score + 1, 5)
+
+    # Boost for budget discussion
+    if any(phrase in text for phrase in budget_phrases):
+        score = min(score + 1, 5)
+
     # Check if they provided personal info (name mentioned)
     if any(m.get("role") == "user" and ("my name is" in m.get("content", "").lower() or "i'm " in m.get("content", "").lower()) for m in messages):
         score = min(score + 1, 5)
+
+    # Extra boost for providing email (stronger commitment)
+    import re
+    email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    if re.search(email_pattern, text):
+        score = min(score + 1, 5)
+
+    # Reduction for tire-kicker signals
+    if any(phrase in text for phrase in tire_kicker_phrases):
+        score = max(score - 1, 1)
 
     return score
 
@@ -1634,7 +1697,11 @@ def extract_user_phone(messages: list) -> str:
 
 
 def extract_interests(messages: list) -> list:
-    """Extract topic keywords from conversation."""
+    """Extract topic keywords from conversation.
+
+    Tracks both technical interests and buying signals.
+    """
+    # Technical/service interests
     keywords = {
         "ai": ["ai", "machine learning", "ml", "llm", "chatbot", "artificial intelligence"],
         "cloud": ["cloud", "aws", "azure", "kubernetes", "devops", "infrastructure"],
@@ -1642,17 +1709,33 @@ def extract_interests(messages: list) -> list:
         "federal": ["federal", "government", "agency", "treasury", "nih", "fda"],
         "enterprise": ["enterprise", "fortune 500", "large scale"],
         "security": ["security", "clearance", "compliance", "fisma"],
-        "migration": ["migration", "upgrade", "modernization"]
+        "migration": ["migration", "upgrade", "modernization"],
+        "data": ["data engineering", "analytics", "database", "etl", "pipeline"],
+        "web": ["website", "web app", "frontend", "react", "angular"]
+    }
+
+    # High-value buying signals (tracked separately to inform lead quality)
+    buying_signals = {
+        "urgent": ["asap", "urgent", "deadline", "immediately", "this week", "right away"],
+        "budget_ready": ["budget approved", "funding", "ready to start", "allocated", "we can pay"],
+        "decision_maker": ["my team", "i lead", "we need", "our company", "i manage", "i'm responsible"],
+        "pricing_discussed": ["pricing", "cost", "quote", "proposal", "rate", "how much"]
     }
 
     text = " ".join([m.get("content", "").lower() for m in messages])
     found = []
 
+    # Check technical interests first
     for topic, phrases in keywords.items():
         if any(phrase in text for phrase in phrases):
             found.append(topic)
 
-    return found[:5]  # Max 5 interests
+    # Then check buying signals
+    for signal, phrases in buying_signals.items():
+        if any(phrase in text for phrase in phrases):
+            found.append(signal)
+
+    return found[:7]  # Increased to 7 to accommodate buying signals
 
 
 # Static files and demo page

@@ -416,6 +416,7 @@ def get_user_context(user_id: str) -> Optional[dict]:
             "is_returning": last_conversation is not None,
             "last_summary": last_conversation.summary if last_conversation else None,
             "last_interests": last_interests,
+            "last_lead_score": last_conversation.lead_score if last_conversation else None,
             "conversation_count": session.query(Conversation).filter(Conversation.user_id == user_id).count(),
             "auth_method": user.auth_method,
             "google_picture": user.google_picture
