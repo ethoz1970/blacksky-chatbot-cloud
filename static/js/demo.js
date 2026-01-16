@@ -1,0 +1,1595 @@
+const API_HOST = window.location.origin;
+const messages = document.getElementById('messages');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+
+let isLoading = false;
+let hasMessages = true;
+let conversationMessages = []; // Track messages for saving
+let currentConversationId = null; // Track conversation ID for updates
+let lastActivityTime = Date.now();
+const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+let followUpTimer = null; // Timer for follow-up message
+
+// Typewriter effect for welcome message
+function typeWriter(text, elementId, speed = 80, onComplete = null) {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+
+  let i = 0;
+  element.textContent = '';
+
+  function type() {
+    if (i < text.length) {
+      element.textContent += text.charAt(i);
+      i++;
+      setTimeout(type, speed);
+    } else if (onComplete) {
+      onComplete();
+    }
+  }
+  type();
+}
+
+// Start follow-up message after delay
+function startFollowUpTimer() {
+  followUpTimer = setTimeout(() => {
+    const followUpLine = document.getElementById('followUpLine');
+    const cursor = document.getElementById('typewriterCursor');
+    if (followUpLine && cursor) {
+      // Move cursor to follow-up line
+      cursor.remove();
+      followUpLine.innerHTML = '<span id="followUpText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span>';
+      followUpLine.style.display = 'block';
+      typeWriter('I am Maurice, the Blacksky AI. Ask me about our work.', 'followUpText', 50);
+    }
+  }, 7000); // 7 seconds
+}
+
+// Cancel follow-up timer
+function cancelFollowUpTimer() {
+  if (followUpTimer) {
+    clearTimeout(followUpTimer);
+    followUpTimer = null;
+  }
+}
+
+// Show welcome message with typewriter effect
+function showWelcomeMessage() {
+  messages.innerHTML = `
+    <div class="message bot" id="welcomeMessage" style="flex:1;display:flex;align-items:center;justify-content:center;">
+      <div class="message-text" style="background:none;border:none;padding:0;text-align:center;">
+        <p style="font-size:1.5rem;color:#666;margin:0;"><span id="typewriterText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span></p>
+        <p id="followUpLine" style="font-size:1rem;color:#555;margin:0.5rem 0 0 0;display:none;"></p>
+      </div>
+    </div>
+  `;
+  typeWriter('... hello world ...', 'typewriterText', 80, startFollowUpTimer);
+}
+
+// User verification state
+let pendingMatches = null; // Potential user matches waiting for verification
+let awaitingVerification = false; // Are we waiting for user to confirm identity?
+
+// User identity state for avatar
+let currentUserName = null;
+let currentUserEmail = null;
+let currentUserPhone = null;
+let currentUserCompany = null;
+
+// Google auth state
+let googleAuthToken = localStorage.getItem('blacksky_auth_token');
+let googleUserPicture = null;
+let isGoogleAuth = false;
+
+// Avatar UI elements
+const avatarBtn = document.getElementById('avatarBtn');
+const avatarDropdown = document.getElementById('avatarDropdown');
+const avatarGreeting = document.getElementById('avatarGreeting');
+const googleSignInBtn = document.getElementById('googleSignIn');
+const softSignInBtn = document.getElementById('softSignIn');
+const dashboardBtn = document.getElementById('dashboardBtn');
+const signOutBtn = document.getElementById('signOut');
+
+// Update avatar display based on current user
+function updateAvatarUI() {
+  if (isGoogleAuth && googleUserPicture) {
+    // Google authenticated user with picture
+    avatarBtn.innerHTML = '<img src="' + googleUserPicture + '" alt="Profile">';
+    avatarBtn.classList.add('google-auth');
+    avatarBtn.classList.remove('known');
+
+    let html = '<span class="user-name">' + currentUserName + '<span class="verified-badge">✓</span></span>';
+    if (currentUserEmail) {
+      html += '<span class="user-detail"><span class="user-detail-label">Email:</span>' + currentUserEmail + '</span>';
+    }
+    avatarGreeting.innerHTML = html;
+
+    // Show sign out and dashboard, hide sign in options
+    googleSignInBtn.style.display = 'none';
+    softSignInBtn.style.display = 'none';
+    dashboardBtn.style.display = 'block';
+    signOutBtn.style.display = 'block';
+  } else if (currentUserName) {
+    // Soft login user
+    avatarBtn.textContent = currentUserName.charAt(0).toUpperCase();
+    avatarBtn.innerHTML = currentUserName.charAt(0).toUpperCase();
+    avatarBtn.classList.add('known');
+    avatarBtn.classList.remove('google-auth');
+
+    let html = '<span class="user-name">' + currentUserName + '</span>';
+    if (currentUserCompany) {
+      html += '<span class="user-detail"><span class="user-detail-label">Company:</span>' + currentUserCompany + '</span>';
+    }
+    if (currentUserEmail) {
+      html += '<span class="user-detail"><span class="user-detail-label">Email:</span>' + currentUserEmail + '</span>';
+    }
+    if (currentUserPhone) {
+      html += '<span class="user-detail"><span class="user-detail-label">Phone:</span>' + currentUserPhone + '</span>';
+    }
+    avatarGreeting.innerHTML = html;
+
+    // Soft login can upgrade to Google, view dashboard, or sign out
+    googleSignInBtn.style.display = 'flex';
+    softSignInBtn.style.display = 'none';
+    dashboardBtn.style.display = 'block';
+    signOutBtn.style.display = 'block';
+  } else {
+    // Anonymous user
+    avatarBtn.textContent = '?';
+    avatarBtn.innerHTML = '?';
+    avatarBtn.classList.remove('known');
+    avatarBtn.classList.remove('google-auth');
+    avatarGreeting.textContent = 'Guest';
+
+    // Show both sign in options, hide dashboard and sign out
+    googleSignInBtn.style.display = 'flex';
+    softSignInBtn.style.display = 'block';
+    dashboardBtn.style.display = 'none';
+    signOutBtn.style.display = 'none';
+  }
+}
+
+// Toggle dropdown
+avatarBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  avatarDropdown.classList.toggle('active');
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.user-avatar')) {
+    avatarDropdown.classList.remove('active');
+  }
+});
+
+// Handle Google sign in
+googleSignInBtn.addEventListener('click', () => {
+  avatarDropdown.classList.remove('active');
+  // Redirect to Google OAuth with current user ID
+  window.location.href = `${API_HOST}/auth/google/login?user_id=${userId}`;
+});
+
+// Handle soft sign in (conversational)
+softSignInBtn.addEventListener('click', () => {
+  avatarDropdown.classList.remove('active');
+  signIn();
+});
+
+// Handle sign out
+signOutBtn.addEventListener('click', () => {
+  avatarDropdown.classList.remove('active');
+  signOut();
+});
+
+// Handle dashboard button
+dashboardBtn.addEventListener('click', () => {
+  avatarDropdown.classList.remove('active');
+  openDashboard();
+});
+
+// Dashboard state
+let dashboardData = null;
+let isEditingProfile = false;
+
+// Fetch dashboard data
+async function fetchDashboardData() {
+  try {
+    const res = await fetch(`${API_HOST}/user/${userId}/dashboard`);
+    if (res.ok) {
+      dashboardData = await res.json();
+      return dashboardData;
+    }
+  } catch (e) {
+    console.error('Error fetching dashboard:', e);
+  }
+  return null;
+}
+
+// Format date for display
+function formatDashboardDate(isoDate) {
+  if (!isoDate) return '-';
+  const date = new Date(isoDate);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Format relative time
+function formatRelativeTime(isoDate) {
+  if (!isoDate) return '-';
+  const date = new Date(isoDate);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return formatDashboardDate(isoDate);
+}
+
+// Build dashboard content HTML
+function buildDashboardContent(data) {
+  const profile = data.profile;
+  const activity = data.activity;
+  const conversations = data.conversations || [];
+  const interests = data.interests || [];
+
+  // Avatar
+  let avatarHtml;
+  if (profile.google_picture) {
+    avatarHtml = `<div class="dashboard-avatar google-auth"><img src="${profile.google_picture}" alt="Profile"></div>`;
+  } else if (profile.name) {
+    avatarHtml = `<div class="dashboard-avatar">${profile.name.charAt(0).toUpperCase()}</div>`;
+  } else {
+    avatarHtml = `<div class="dashboard-avatar">?</div>`;
+  }
+
+  // Name with verified badge
+  let nameHtml = profile.name || 'Anonymous';
+  if (profile.auth_method === 'google') {
+    nameHtml += '<span class="verified-badge">✓</span>';
+  }
+
+  // Profile details
+  let detailsHtml = '';
+  if (profile.email) detailsHtml += `<div class="dashboard-detail">${profile.email}</div>`;
+  if (profile.company) detailsHtml += `<div class="dashboard-detail">${profile.company}</div>`;
+  if (profile.phone) detailsHtml += `<div class="dashboard-detail">${profile.phone}</div>`;
+
+  // Activity stats
+  const memberSince = formatDashboardDate(activity.member_since);
+  const lastActive = formatRelativeTime(activity.last_active);
+
+  // Conversation history
+  let conversationsHtml = '';
+  if (conversations.length === 0) {
+    conversationsHtml = '<div class="dashboard-empty">No conversations yet</div>';
+  } else {
+    conversations.slice(0, 10).forEach(conv => {
+      const date = formatDashboardDate(conv.date);
+      const summary = conv.summary || 'No summary';
+      conversationsHtml += `
+        <div class="dashboard-conversation">
+          <div class="dashboard-conversation-date">${date}</div>
+          <div class="dashboard-conversation-summary">${summary}</div>
+        </div>
+      `;
+    });
+  }
+
+  // Interests
+  let interestsHtml = '';
+  if (interests.length === 0) {
+    interestsHtml = '<div class="dashboard-empty">No interests tracked yet</div>';
+  } else {
+    interests.forEach(interest => {
+      interestsHtml += `<span class="dashboard-interest-tag">${interest}</span>`;
+    });
+  }
+
+  return `
+    <div class="dashboard-profile">
+      ${avatarHtml}
+      <div class="dashboard-info">
+        <div class="dashboard-name">${nameHtml}</div>
+        ${detailsHtml || '<div class="dashboard-detail" style="color:#555">No details yet</div>'}
+        <button class="dashboard-edit-btn" onclick="showEditProfile()">Edit Profile</button>
+      </div>
+    </div>
+
+    <div class="dashboard-stats">
+      <div class="dashboard-stat">
+        <div class="dashboard-stat-value">${activity.conversation_count}</div>
+        <div class="dashboard-stat-label">Conversations</div>
+      </div>
+      <div class="dashboard-stat">
+        <div class="dashboard-stat-value">${memberSince}</div>
+        <div class="dashboard-stat-label">Joined</div>
+      </div>
+      <div class="dashboard-stat">
+        <div class="dashboard-stat-value">${lastActive}</div>
+        <div class="dashboard-stat-label">Last Active</div>
+      </div>
+    </div>
+
+    <div class="dashboard-section-title">Conversation History</div>
+    ${conversationsHtml}
+
+    <div class="dashboard-section-title">Interests</div>
+    <div class="dashboard-interests">
+      ${interestsHtml}
+    </div>
+  `;
+}
+
+// Build edit form HTML
+function buildEditFormContent(data) {
+  const profile = data.profile;
+  return `
+    <div class="dashboard-edit-form">
+      <div class="dashboard-form-group">
+        <label>Name</label>
+        <input type="text" id="editName" value="${profile.name || ''}" placeholder="Your name">
+      </div>
+      <div class="dashboard-form-group">
+        <label>Email</label>
+        <input type="email" id="editEmail" value="${profile.email || ''}" placeholder="your@email.com">
+      </div>
+      <div class="dashboard-form-group">
+        <label>Phone</label>
+        <input type="tel" id="editPhone" value="${profile.phone || ''}" placeholder="(555) 123-4567">
+      </div>
+      <div class="dashboard-form-group">
+        <label>Company</label>
+        <input type="text" id="editCompany" value="${profile.company || ''}" placeholder="Your company">
+      </div>
+      <div class="dashboard-form-actions">
+        <button class="dashboard-btn-cancel" onclick="cancelEditProfile()">Cancel</button>
+        <button class="dashboard-btn-save" onclick="saveProfileChanges()">Save Changes</button>
+      </div>
+    </div>
+  `;
+}
+
+// Open dashboard panel
+async function openDashboard() {
+  // Show loading state
+  openPanel({
+    title: 'My Dashboard',
+    content: '<div style="color:#666; text-align:center; padding:40px;">Loading...</div>'
+  });
+
+  // Fetch data
+  const data = await fetchDashboardData();
+  if (data) {
+    dashboardData = data;
+    slideoutContent.innerHTML = buildDashboardContent(data);
+  } else {
+    slideoutContent.innerHTML = '<div style="color:#666; text-align:center; padding:40px;">Could not load dashboard</div>';
+  }
+}
+
+// Show edit profile form
+window.showEditProfile = function() {
+  if (dashboardData) {
+    isEditingProfile = true;
+    slideoutTitle.textContent = 'Edit Profile';
+    slideoutContent.innerHTML = buildEditFormContent(dashboardData);
+  }
+};
+
+// Cancel edit profile
+window.cancelEditProfile = function() {
+  if (dashboardData) {
+    isEditingProfile = false;
+    slideoutTitle.textContent = 'My Dashboard';
+    slideoutContent.innerHTML = buildDashboardContent(dashboardData);
+  }
+};
+
+// Save profile changes
+window.saveProfileChanges = async function() {
+  const name = document.getElementById('editName').value.trim();
+  const email = document.getElementById('editEmail').value.trim();
+  const phone = document.getElementById('editPhone').value.trim();
+  const company = document.getElementById('editCompany').value.trim();
+
+  try {
+    const res = await fetch(`${API_HOST}/user/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        name: name || null,
+        email: email || null,
+        phone: phone || null,
+        company: company || null
+      })
+    });
+
+    if (res.ok) {
+      // Update local state
+      currentUserName = name || null;
+      currentUserEmail = email || null;
+      currentUserPhone = phone || null;
+      currentUserCompany = company || null;
+
+      // Update avatar
+      updateAvatarUI();
+
+      // Refresh dashboard data
+      dashboardData = await fetchDashboardData();
+      if (dashboardData) {
+        isEditingProfile = false;
+        slideoutTitle.textContent = 'My Dashboard';
+        slideoutContent.innerHTML = buildDashboardContent(dashboardData);
+      }
+    } else {
+      alert('Failed to save changes');
+    }
+  } catch (e) {
+    console.error('Error saving profile:', e);
+    alert('Error saving changes');
+  }
+};
+
+function signOut() {
+  // Clear Google auth state
+  localStorage.removeItem('blacksky_auth_token');
+  googleAuthToken = null;
+  googleUserPicture = null;
+  isGoogleAuth = false;
+  // Generate new user ID
+  userId = generateUUID();
+  setCookie('blacksky_user_id', userId, 30);
+
+  // Clear all user info
+  currentUserName = null;
+  currentUserEmail = null;
+  currentUserPhone = null;
+  currentUserCompany = null;
+  updateAvatarUI();
+
+  // Reset conversation
+  conversationMessages = [];
+  currentConversationId = null;
+
+  // Clear chat and show fresh welcome with typewriter effect
+  showWelcomeMessage();
+
+  // Reset verification state
+  pendingMatches = null;
+  awaitingVerification = false;
+}
+
+async function signIn() {
+  // Trigger Maurice to introduce himself (no user message shown)
+  if (isLoading) return;
+
+  isLoading = true;
+  sendBtn.disabled = true;
+  showTyping();
+
+  try {
+    const res = await fetch(`${API_HOST}/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, introduce: true })
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    hideTyping();
+
+    // Create bot message container for streaming
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message bot';
+    messageDiv.innerHTML = `
+      <div class="message-label">Maurice</div>
+      <div class="message-text"></div>
+    `;
+    messages.appendChild(messageDiv);
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    const textDiv = messageDiv.querySelector('.message-text');
+    let fullResponse = '';
+    let lastScrollTime = 0;
+
+    // Read the stream
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.token) {
+              fullResponse += parsed.token;
+              textDiv.innerHTML = formatResponse(fullResponse);
+              const now = Date.now();
+              if (now - lastScrollTime > 300) {
+                messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                lastScrollTime = now;
+              }
+            }
+          } catch (e) {
+            // Skip malformed JSON
+          }
+        }
+      }
+    }
+
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    // Track Maurice's introduction in conversation
+    if (fullResponse) {
+      conversationMessages.push({ role: 'assistant', content: fullResponse });
+    }
+
+  } catch (err) {
+    console.error('Sign in error:', err);
+    hideTyping();
+    addMessage("Sorry, I couldn't introduce myself right now. Please try again.", 'bot');
+  } finally {
+    isLoading = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+// Fetch user context on page load to check if Maurice knows them
+async function fetchUserContext() {
+  try {
+    const res = await fetch(`${API_HOST}/user/${userId}/context`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.name) {
+        currentUserName = data.name;
+        currentUserEmail = data.email;
+        currentUserPhone = data.phone;
+        currentUserCompany = data.company;
+        // Check if user is Google authenticated
+        if (data.auth_method === 'google' && data.google_picture) {
+          isGoogleAuth = true;
+          googleUserPicture = data.google_picture;
+        }
+        updateAvatarUI();
+      }
+    }
+  } catch (e) {
+    // Silently fail - user is just anonymous
+    console.log('Could not fetch user context');
+  }
+}
+
+// Verify Google auth token
+async function verifyGoogleAuth(token) {
+  try {
+    const res = await fetch(`${API_HOST}/auth/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.valid) {
+        // Update user state with Google auth info
+        userId = data.user_id;
+        setCookie('blacksky_user_id', userId, 30);
+        currentUserName = data.name;
+        currentUserEmail = data.email;
+        googleUserPicture = data.picture;
+        isGoogleAuth = true;
+        updateAvatarUI();
+        return true;
+      }
+    }
+  } catch (e) {
+    console.error('Auth verification failed:', e);
+  }
+  // Invalid token - clear it
+  localStorage.removeItem('blacksky_auth_token');
+  googleAuthToken = null;
+  return false;
+}
+
+// Check for auth token in URL (OAuth callback redirect)
+function checkAuthCallback() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('auth_token');
+  const authError = urlParams.get('auth_error');
+
+  if (authError) {
+    console.error('Google auth failed:', authError);
+    alert('Google sign-in failed: ' + decodeURIComponent(authError));
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return Promise.resolve(false);
+  }
+
+  if (token) {
+    // Store token and verify
+    localStorage.setItem('blacksky_auth_token', token);
+    googleAuthToken = token;
+    // Clean URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return verifyGoogleAuth(token);
+  }
+  return Promise.resolve(false);
+}
+
+// Cookie utilities
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+function setCookie(name, value, days) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Get or create user ID
+let userId = getCookie('blacksky_user_id');
+if (!userId) {
+  userId = generateUUID();
+  setCookie('blacksky_user_id', userId, 30); // 30 day expiry
+}
+
+// Initialize avatar on page load (must be after userId is set)
+// Check for OAuth callback first, then verify stored token, then fetch context
+async function initializeAuth() {
+  // Check for token in URL (OAuth callback)
+  const callbackResult = await checkAuthCallback();
+  if (callbackResult) {
+    return; // Already authenticated via callback
+  }
+
+  // Check for stored token
+  if (googleAuthToken) {
+    const verified = await verifyGoogleAuth(googleAuthToken);
+    if (verified) {
+      return; // Token still valid
+    }
+  }
+
+  // No Google auth - check regular user context
+  await fetchUserContext();
+}
+
+initializeAuth();
+
+// Start typewriter effect for welcome message
+typeWriter('... hello world ...', 'typewriterText', 80, startFollowUpTimer);
+
+// Save conversation on page unload or inactivity
+async function saveConversation() {
+  if (conversationMessages.length === 0) return;
+
+  try {
+    const requestBody = {
+      user_id: userId,
+      messages: conversationMessages
+    };
+
+    // Include conversation_id if we have one (for updates)
+    if (currentConversationId) {
+      requestBody.conversation_id = currentConversationId;
+    }
+
+    const res = await fetch(`${API_HOST}/conversation/end`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      keepalive: true // Ensure request completes even if page unloads
+    });
+
+    // Check if user info was extracted and update avatar
+    if (res.ok) {
+      const data = await res.json();
+
+      // Store conversation ID for future updates
+      if (data.conversation_id && !currentConversationId) {
+        currentConversationId = data.conversation_id;
+      }
+
+      let updated = false;
+      if (data.name_extracted && !currentUserName) {
+        currentUserName = data.name_extracted;
+        updated = true;
+      }
+      if (data.email_extracted && !currentUserEmail) {
+        currentUserEmail = data.email_extracted;
+        updated = true;
+      }
+      if (data.phone_extracted && !currentUserPhone) {
+        currentUserPhone = data.phone_extracted;
+        updated = true;
+      }
+      if (data.company_extracted && !currentUserCompany) {
+        currentUserCompany = data.company_extracted;
+        updated = true;
+      }
+      if (updated) {
+        updateAvatarUI();
+      }
+    }
+  } catch (e) {
+    console.error('Failed to save conversation:', e);
+  }
+}
+
+// Handle page unload
+window.addEventListener('beforeunload', saveConversation);
+
+// Check for inactivity
+setInterval(() => {
+  if (conversationMessages.length > 0 && Date.now() - lastActivityTime > INACTIVITY_TIMEOUT) {
+    saveConversation();
+    conversationMessages = []; // Reset after saving
+  }
+}, 60000); // Check every minute
+
+// Detect if user message contains a name (after Maurice asked)
+function extractNameFromMessage(text) {
+  const patterns = [
+    /(?:my name is|i'm|i am|call me|this is)\s+([a-z]+(?:\s+[a-z]+){0,2})/i,
+    /^([a-z]+)(?:\s+here)?[.!]?$/i
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1].length >= 2 && match[1].length <= 30) {
+      // Capitalize first letter of each word
+      const name = match[1].trim().replace(/\b\w/g, c => c.toUpperCase());
+      return name;
+    }
+  }
+  return null;
+}
+
+// Check if user is confirming their identity
+function isConfirmation(text) {
+  const confirmations = ['yes', 'yeah', 'yep', 'yup', 'that\'s me', 'thats me', 'correct', 'right', 'exactly', 'sure'];
+  return confirmations.some(c => text.toLowerCase().includes(c));
+}
+
+// Look up user by name
+async function lookupUserByName(name) {
+  try {
+    const res = await fetch(`${API_HOST}/user/lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.error('User lookup failed:', e);
+    return null;
+  }
+}
+
+// Link current session to existing user
+async function linkToUser(targetUserId) {
+  try {
+    const res = await fetch(`${API_HOST}/user/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_user_id: userId,
+        target_user_id: targetUserId
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // Update our userId to the linked user
+      userId = data.new_user_id;
+      setCookie('blacksky_user_id', userId, 30);
+      console.log('Session linked to existing user:', userId);
+      return true;
+    }
+  } catch (e) {
+    console.error('User link failed:', e);
+  }
+  return false;
+}
+
+// Global panels object for slideouts (accessible by both image cards and text links)
+const panels = {
+    treasury: {
+      title: 'Treasury Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky architected and executed migration of 6 mission-critical SharePoint sites to a unified Drupal 8 platform for treasury.gov, consolidating fragmented content systems into a cohesive digital ecosystem.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Designed enterprise content architecture supporting treasury.gov and 5 subsidiary sites, used by 200+ content creators.</p>
+        <p>Built custom migration framework successfully migrating 15,000+ documents and pages with 98% content fidelity.</p>
+        <p>Reduced deployment time from 3 days to 4 hours through CI/CD pipeline improvements.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 8, PHP, XML processing, Acquia Cloud, custom ETL tools</p>
+      `
+    },
+    nih: {
+      title: 'NIH Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky architected a migration from Drupal 8 to Drupal 10 for the National Institute of Nursing Research, requiring federal security clearance and compliance with strict government security protocols.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Designed FISMA-compliant architecture meeting NIH security standards and federal data protection requirements.</p>
+        <p>Architected custom integration layer connecting NIH research databases with public-facing website.</p>
+        <p>Implemented Apache Solr search infrastructure enabling complex research publication queries.</p>
+
+        <div class="section-title">› Security</div>
+        <p>NIH background check and facility badge required.</p>
+      `
+    },
+    fda: {
+      title: 'FDA Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky contributed to FDA platform enhancements supporting regulatory requirements through Phase2.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
+      `
+    },
+    usda: {
+      title: 'USDA FSIS Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky led the architectural design and implementation of an enterprise-scale Drupal 10 platform modernization for the USDA Food Safety and Inspection Service, focusing on high-availability infrastructure and AI-powered content services.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Designed and implemented Redis Cluster architecture on Azure Kubernetes Service, improving application response times by 70%.</p>
+        <p>Architected AI-powered translation service enabling real-time multilingual content delivery across 15+ languages.</p>
+        <p>Established Kubernetes deployment pipeline with automated scaling, reducing infrastructure costs by 40%.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 10, PHP, Kubernetes, Redis Cluster, Azure Cloud, Apache Solr, AI integration</p>
+      `
+    },
+    vanguard: {
+      title: 'Vanguard Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky led technical transformation from monolithic Drupal 8 to headless architecture, decoupling content management from presentation layer for multi-channel content delivery.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Designed and implemented RESTful API layer serving content to Angular frontend.</p>
+        <p>Architected content export system reducing API response times by 40%.</p>
+        <p>Led Drupal 8 to 9 upgrade while simultaneously implementing headless architecture without service interruption.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 9, PHP, RESTful APIs, JSON, Angular, Acquia Cloud, AWS, PHPUnit</p>
+      `
+    },
+    mastercard: {
+      title: 'Mastercard Project',
+      content: `
+        <img src="/static/images/mastercard.png" alt="Mastercard" class="slideout-image" onerror="this.style.display='none'">
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky built a custom bulk upload system for Mastercard enabling efficient file processing and content management.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Built custom Drupal 9 module enabling bulk upload of hundreds of files with automated validation.</p>
+        <p>Designed file processing pipeline including unzip functionality, naming convention verification, and automated node creation.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 9, PHP, Acquia Cloud, Docker</p>
+      `
+    },
+    mission: {
+      title: 'Our Mission',
+      content: `
+        <div class="section-title">› What We Believe</div>
+        <p>Blacksky believes technology should empower people, not just corporations.</p>
+        <p>While we build AI solutions for enterprises and federal agencies, our deeper mission is using technology to strengthen democracy and civic participation.</p>
+
+        <div class="section-title">› Civic Technology</div>
+        <p>Our flagship project, Poly Sci Fi, reflects this commitment—a platform designed not for political division, but for accountability, giving everyday citizens the tools to engage meaningfully with their elected officials.</p>
+
+        <div class="section-title">› Our Values</div>
+        <p>We believe that the same AI capabilities transforming business can transform civic life: making government more transparent, participation more accessible, and democracy more responsive.</p>
+        <p>Technology is never neutral—we choose to build tools that make society more equitable, informed, and engaged.</p>
+      `
+    },
+    about: {
+      title: 'About Blacksky',
+      content: `
+        <div class="section-title">› Origin</div>
+        <p>Blacksky started the way most good things do—with curiosity and a blinking cursor. Before there were bootcamps or YouTube tutorials, there was a kid in an 8th grade computer lab, teaching himself to code on an Apple IIe. That obsession never faded. It just evolved.</p>
+        <p>Eighteen years ago, that curiosity became a company. Blacksky LLC was founded on a simple premise: technology is craft.</p>
+
+        <div class="section-title">› What We Do</div>
+        <p>We architect enterprise platforms for organizations where failure isn't an option. Federal agencies like Treasury, NIH, FDA, and DOT. Fortune 500 companies like Vanguard and Mastercard.</p>
+
+        <div class="section-title">› The Name</div>
+        <p>Blacksky. It's the moment before dawn. The blank terminal waiting for input. The darkness that makes stars visible. It's potential—quiet, vast, and ready.</p>
+      `
+    },
+    dot: {
+      title: 'DOT Project',
+      content: `
+        <img src="/static/images/transportation2.png.webp" alt="DOT" class="slideout-image" onerror="this.style.display='none'">
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky developed a comprehensive infrastructure tracking dashboard for the Department of Transportation, enabling real-time monitoring of $100M+ in federal infrastructure projects.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Built interactive data visualization dashboard tracking project milestones, budgets, and completion status across multiple regions.</p>
+        <p>Implemented real-time reporting system integrating data from multiple DOT divisions.</p>
+        <p>Designed responsive interface for field engineers accessing project data on mobile devices.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 9, PHP, PostgreSQL, Chart.js, D3.js, AWS</p>
+      `
+    },
+    sec: {
+      title: 'SEC Project',
+      content: `
+        <img src="/static/images/sec.png" alt="SEC" class="slideout-image" onerror="this.style.display='none'">
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky contributed to the Securities and Exchange Commission's regulatory compliance platform, supporting document management and public disclosure requirements.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Enhanced document management workflows for regulatory filings and public disclosures.</p>
+        <p>Implemented Apache Solr search infrastructure for querying millions of financial documents.</p>
+        <p>Built automated compliance reporting tools for internal audit teams.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 8, PHP, Apache Solr, AWS, Docker</p>
+      `
+    },
+    hhs: {
+      title: 'HHS Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky supported the Department of Health and Human Services with public health information portal development, serving millions of Americans seeking healthcare guidance.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Developed multi-site content architecture supporting HHS sub-agencies and regional offices.</p>
+        <p>Implemented accessibility-first design meeting Section 508 compliance requirements.</p>
+        <p>Built content syndication system for distributing health alerts across partner sites.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 9, PHP, Acquia Cloud, ElasticSearch</p>
+      `
+    },
+    usaid: {
+      title: 'USAID Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky architected an international development program tracking platform for USAID, supporting grant management and program reporting across global initiatives.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Designed workflow system for tracking international development grants from application through completion.</p>
+        <p>Built multi-language content delivery supporting program information in 20+ languages.</p>
+        <p>Implemented data visualization tools for program impact reporting to Congress.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 8, PHP, AWS, PostgreSQL, React</p>
+      `
+    },
+    bcbs: {
+      title: 'Blue Cross Blue Shield Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky led member portal modernization for Blue Cross Blue Shield, improving healthcare data integration and member self-service capabilities.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Modernized legacy member portal to responsive Drupal 9 platform serving 2M+ members.</p>
+        <p>Integrated real-time benefits and claims data from multiple backend healthcare systems.</p>
+        <p>Implemented HIPAA-compliant document management for explanation of benefits and medical records.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 9, PHP, Azure, HL7 FHIR, React</p>
+      `
+    },
+    worldbank: {
+      title: 'World Bank Project',
+      content: `
+        <img src="/static/images/worldbank.png" alt="World Bank" class="slideout-image" onerror="this.style.display='none'">
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky developed a research publication platform for the World Bank, enabling global access to development economics research and policy documents.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Built multi-language content delivery system supporting publications in 7 official languages.</p>
+        <p>Implemented advanced search and filtering for 50,000+ research documents and datasets.</p>
+        <p>Designed API layer for programmatic access to World Bank research data.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 8, PHP, AWS, ElasticSearch, React</p>
+      `
+    },
+    billboard: {
+      title: 'Billboard Project',
+      content: `
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky contributed to Billboard's music industry data platform, supporting chart tracking, artist pages, and music industry analytics.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Enhanced chart tracking system processing real-time streaming and sales data.</p>
+        <p>Built artist profile pages integrating data from multiple music industry sources.</p>
+        <p>Implemented content recommendation engine for personalized music discovery.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 8, PHP, ElasticSearch, Redis, AWS</p>
+      `
+    },
+    nga: {
+      title: 'National Gallery of Art Project',
+      content: `
+        <img src="/static/images/nga.png.webp" alt="National Gallery of Art" class="slideout-image" onerror="this.style.display='none'">
+        <div class="section-title">› Project Overview</div>
+        <p>Blacksky developed a digital collections platform for the National Gallery of Art, enabling high-resolution image delivery and scholarly research access.</p>
+
+        <div class="section-title">› Key Accomplishments</div>
+        <p>Built IIIF-compliant image delivery system for 150,000+ artworks with deep zoom capabilities.</p>
+        <p>Implemented collection search and browse features with faceted filtering by artist, period, and medium.</p>
+        <p>Designed responsive gallery views for virtual exhibition experiences.</p>
+
+        <div class="section-title">› Technologies</div>
+        <p>Drupal 9, PHP, IIIF, AWS S3, CloudFront, ElasticSearch</p>
+      `
+    },
+    drupal: {
+      title: 'Drupal Expertise',
+      content: `
+        <div class="section-title">› Platform Expertise</div>
+        <p>Blacksky brings 15+ years of enterprise Drupal development experience, from early Drupal 5 through the latest Drupal 10 release.</p>
+
+        <div class="section-title">› Capabilities</div>
+        <p>Custom module development for complex business requirements.</p>
+        <p>Large-scale migrations from legacy CMS platforms (SharePoint, Adobe, WordPress).</p>
+        <p>Performance optimization and caching strategies for high-traffic sites.</p>
+        <p>Security hardening and FISMA compliance for federal deployments.</p>
+
+        <div class="section-title">› Version Experience</div>
+        <p>Drupal 7, 8, 9, 10 - including major version upgrades and headless implementations</p>
+      `
+    },
+    kubernetes: {
+      title: 'Kubernetes Expertise',
+      content: `
+        <div class="section-title">› Container Orchestration</div>
+        <p>Blacksky implements Kubernetes-based deployments for high-availability, auto-scaling infrastructure that meets enterprise and federal requirements.</p>
+
+        <div class="section-title">› Capabilities</div>
+        <p>Azure Kubernetes Service (AKS) deployments for federal workloads.</p>
+        <p>Helm chart development for repeatable, version-controlled deployments.</p>
+        <p>Horizontal pod autoscaling based on custom metrics.</p>
+        <p>Ingress configuration and TLS certificate management.</p>
+
+        <div class="section-title">› Project Example</div>
+        <p>USDA FSIS: Deployed Redis Cluster on AKS, improving response times by 70% and reducing infrastructure costs by 40% through auto-scaling.</p>
+      `
+    },
+    azure: {
+      title: 'Azure Expertise',
+      content: `
+        <div class="section-title">› Cloud Platform</div>
+        <p>Blacksky architects Azure-based solutions for enterprise and federal clients requiring FedRAMP compliance and government cloud deployments.</p>
+
+        <div class="section-title">› Services</div>
+        <p>Azure Kubernetes Service (AKS) for container orchestration.</p>
+        <p>Azure Cache for Redis - including Redis Cluster deployments.</p>
+        <p>Azure App Services for PaaS web hosting.</p>
+        <p>Azure DevOps for CI/CD pipelines.</p>
+
+        <div class="section-title">› Compliance</div>
+        <p>Experience with Azure Government cloud for federal workloads requiring FedRAMP High authorization.</p>
+      `
+    },
+    aws: {
+      title: 'AWS Expertise',
+      content: `
+        <div class="section-title">› Cloud Platform</div>
+        <p>Blacksky implements AWS infrastructure for scalable, reliable application deployments across enterprise and federal environments.</p>
+
+        <div class="section-title">› Services</div>
+        <p>EC2, ECS, and Lambda for compute workloads.</p>
+        <p>S3 and CloudFront for content delivery and storage.</p>
+        <p>RDS and DynamoDB for database services.</p>
+        <p>ElastiCache for Redis and Memcached caching layers.</p>
+
+        <div class="section-title">› Project Examples</div>
+        <p>Vanguard: Multi-region deployment with CloudFront CDN.</p>
+        <p>World Bank: S3-based document storage with lifecycle policies.</p>
+        <p>SEC: ElasticSearch cluster on AWS for regulatory document search.</p>
+      `
+    }
+};
+
+// Convert entity names in text to clickable links
+function addEntityLinks(text) {
+  const entities = [
+    { pattern: /\bTreasury\b/g, key: 'treasury' },
+    { pattern: /\bNIH\b/g, key: 'nih' },
+    { pattern: /\bFDA\b/g, key: 'fda' },
+    { pattern: /\bUSDA\b/g, key: 'usda' },
+    { pattern: /\bFSIS\b/g, key: 'usda' },
+    { pattern: /\bDOT\b/g, key: 'dot' },
+    { pattern: /\bSEC\b/g, key: 'sec' },
+    { pattern: /\bHHS\b/g, key: 'hhs' },
+    { pattern: /\bUSAID\b/g, key: 'usaid' },
+    { pattern: /\bVanguard\b/gi, key: 'vanguard' },
+    { pattern: /\bMastercard\b/gi, key: 'mastercard' },
+    { pattern: /\bBlue Cross\b/gi, key: 'bcbs' },
+    { pattern: /\bWorld Bank\b/gi, key: 'worldbank' },
+    { pattern: /\bBillboard\b/gi, key: 'billboard' },
+    { pattern: /\bNational Gallery\b/gi, key: 'nga' },
+    { pattern: /\bDrupal\b/gi, key: 'drupal' },
+    { pattern: /\bKubernetes\b/gi, key: 'kubernetes' },
+    { pattern: /\bAzure\b/gi, key: 'azure' },
+    { pattern: /\bAWS\b/g, key: 'aws' },
+  ];
+
+  for (const { pattern, key } of entities) {
+    text = text.replace(pattern, `<span class="inline-link" data-panel-key="${key}">$&</span>`);
+  }
+  return text;
+}
+
+// Format quotes from Bruce Lee, Frank Ocean, Robert Greene with styled blocks
+function formatQuotes(text) {
+  // Pattern: "quote text" — Source (em-dash, en-dash, or hyphen)
+  text = text.replace(
+    /"([^"]+)"\s*[—–-]\s*(Bruce Lee|Frank Ocean|Robert Greene)/gi,
+    '<div class="quote-block">"$1"<div class="quote-source">— $2</div></div>'
+  );
+
+  // Pattern: As X said, "quote" or X once said, "quote"
+  text = text.replace(
+    /(?:As\s+)?(Bruce Lee|Frank Ocean|Robert Greene)\s+(?:once\s+)?said,?\s*"([^"]+)"/gi,
+    '<div class="quote-block">"$2"<div class="quote-source">— $1</div></div>'
+  );
+
+  // Pattern: Law X: "quote" (48 Laws of Power)
+  text = text.replace(
+    /(Law\s+\d+):\s*"([^"]+)"/gi,
+    '<div class="quote-block">"$2"<div class="quote-source">— $1, 48 Laws of Power</div></div>'
+  );
+
+  return text;
+}
+
+function getImageForTopic(text) {
+  const lower = text.toLowerCase();
+
+  // Federal agencies
+  if (lower.includes('treasury')) return { src: '/static/images/treasury.png', alt: 'U.S. Department of Treasury', category: 'Federal Agency', panel: panels.treasury };
+  if (lower.includes('nih') || lower.includes('national institute of health')) return { src: '/static/images/nih.png', alt: 'National Institutes of Health', category: 'Federal Agency', panel: panels.nih };
+  if (lower.includes('fda')) return { src: '/static/images/fda.png', alt: 'Food & Drug Administration', category: 'Federal Agency', panel: panels.fda };
+  if (lower.includes('usda') || lower.includes('fsis') || lower.includes('food safety')) return { src: '/static/images/usda.png', alt: 'USDA Food Safety', category: 'Federal Agency', panel: panels.usda };
+  if (lower.includes('dot') || lower.includes('transportation')) return { src: '/static/images/transportation2.png.webp', alt: 'Department of Transportation', category: 'Federal Agency', panel: panels.dot };
+  if (lower.includes('sec') || lower.includes('securities')) return { src: '/static/images/sec.png', alt: 'Securities & Exchange Commission', category: 'Federal Agency', panel: panels.sec };
+  if (lower.includes('hhs') || lower.includes('health and human')) return { src: '/static/images/hhs.png', alt: 'Health & Human Services', category: 'Federal Agency', panel: panels.hhs };
+  if (lower.includes('usaid')) return { src: '/static/images/usaid.png', alt: 'USAID', category: 'Federal Agency', panel: panels.usaid };
+
+  // Companies
+  if (lower.includes('vanguard')) return { src: '/static/images/vanguard.png', alt: 'Vanguard', category: 'Enterprise Client', panel: panels.vanguard };
+  if (lower.includes('mastercard')) return { src: '/static/images/mastercard.png', alt: 'Mastercard', category: 'Enterprise Client', panel: panels.mastercard };
+  if (lower.includes('blue cross') || lower.includes('bcbs')) return { src: '/static/images/bcbs.png', alt: 'Blue Cross Blue Shield', category: 'Enterprise Client', panel: panels.bcbs };
+  if (lower.includes('world bank')) return { src: '/static/images/worldbank.png', alt: 'World Bank', category: 'International', panel: panels.worldbank };
+  if (lower.includes('billboard')) return { src: '/static/images/billboard.png', alt: 'Billboard', category: 'Media', panel: panels.billboard };
+  if (lower.includes('national gallery') || lower.includes('art gallery')) return { src: '/static/images/nga.png.webp', alt: 'National Gallery of Art', category: 'Cultural Institution', panel: panels.nga };
+
+  // Technologies
+  if (lower.includes('drupal')) return { src: '/static/images/drupal.png', alt: 'Drupal', category: 'Technology', panel: panels.drupal };
+  if (lower.includes('kubernetes') || lower.includes('k8s')) return { src: '/static/images/kubernetes.png', alt: 'Kubernetes', category: 'Technology', panel: panels.kubernetes };
+  if (lower.includes('azure')) return { src: '/static/images/azure.png', alt: 'Microsoft Azure', category: 'Cloud Platform', panel: panels.azure };
+  if (lower.includes('aws') || lower.includes('amazon web')) return { src: '/static/images/aws.png', alt: 'Amazon Web Services', category: 'Cloud Platform', panel: panels.aws };
+
+  return null;
+}
+
+function formatMessage(text) {
+  // Strip markdown bold **text** and __text__
+  text = text.replace(/\*\*(.+?)\*\*/g, '$1');
+  text = text.replace(/__(.+?)__/g, '$1');
+
+  // Strip markdown italic *text* and _text_
+  text = text.replace(/\*(.+?)\*/g, '$1');
+  text = text.replace(/_(.+?)_/g, '$1');
+
+  // Split into lines
+  let lines = text.split('\n');
+  let formatted = [];
+  let inList = false;
+  let listItems = [];
+
+  for (let line of lines) {
+    // Check if line is a list item
+    if (line.trim().match(/^[-•›]\s+/) || line.trim().match(/^\d+\.\s+/)) {
+      // Clean the bullet/number
+      let content = line.trim().replace(/^[-•›]\s+/, '').replace(/^\d+\.\s+/, '');
+      listItems.push(content);
+      inList = true;
+    } else {
+      // If we were in a list, close it
+      if (inList && listItems.length > 0) {
+        let listHtml = listItems.map(item => `<span class="list-item">› ${item}</span>`).join('');
+        formatted.push(listHtml);
+        listItems = [];
+        inList = false;
+      }
+      // Add regular line
+      if (line.trim()) {
+        formatted.push(line);
+      }
+    }
+  }
+
+  // Handle any remaining list items
+  if (listItems.length > 0) {
+    let listHtml = listItems.map(item => `<span class="list-item">› ${item}</span>`).join('');
+    formatted.push(listHtml);
+  }
+
+  return formatted.join('<br><br>');
+}
+
+function addMessage(text, sender) {
+  const div = document.createElement('div');
+  div.className = `message ${sender}`;
+
+  const label = sender === 'bot' ? 'Blacksky' : (currentUserName || 'You');
+  const content = sender === 'bot'
+    ? formatMessage(text)
+    : text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
+  // Check for relevant image
+  let imageHtml = '';
+  if (sender === 'bot') {
+    const image = getImageForTopic(text);
+    if (image) {
+      // Use encodeURIComponent for unicode-safe encoding
+      const clickable = image.panel ? 'data-panel="' + encodeURIComponent(JSON.stringify(image.panel)) + '"' : '';
+      const clickClass = image.panel ? 'clickable' : '';
+      imageHtml = `
+        <div class="message-image-wrapper ${clickClass}" ${clickable}>
+          <img src="${image.src}" alt="${image.alt}" class="message-image" onerror="this.parentElement.style.display='none'">
+          <div class="message-image-meta">
+            <span class="message-image-category">${image.category}</span>
+            <span class="message-image-caption">${image.alt}${image.panel ? ' ›' : ''}</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  div.innerHTML = `
+    <div class="message-label">${label}</div>
+    <div class="message-text">${imageHtml}${content}</div>
+  `;
+
+  messages.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'message bot';
+  div.id = 'typing';
+  div.innerHTML = `
+    <div class="message-label">Blacksky</div>
+    <div class="message-text"><span class="typing-indicator"></span></div>
+  `;
+  messages.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function hideTyping() {
+  const typing = document.getElementById('typing');
+  if (typing) typing.remove();
+}
+
+function autoResize() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+}
+
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text || isLoading) return;
+
+  // Hide welcome message cursor and remove welcome message on first prompt
+  const welcomeMsg = document.getElementById('welcomeMessage');
+  if (welcomeMsg) {
+    cancelFollowUpTimer();
+    welcomeMsg.remove();
+  }
+
+  addMessage(text, 'user');
+  input.value = '';
+  autoResize();
+
+  // Track message and update activity
+  conversationMessages.push({ role: 'user', content: text });
+  lastActivityTime = Date.now();
+
+  // Check if user is confirming their identity
+  if (awaitingVerification && pendingMatches && pendingMatches.length > 0) {
+    if (isConfirmation(text)) {
+      // User confirmed - link to the first match
+      const linked = await linkToUser(pendingMatches[0].user_id);
+      if (linked) {
+        // Update avatar with confirmed name
+        currentUserName = pendingMatches[0].name;
+        updateAvatarUI();
+      }
+    }
+    // Reset verification state either way
+    awaitingVerification = false;
+    pendingMatches = null;
+  }
+
+  // Check if user just provided their name
+  const extractedName = extractNameFromMessage(text);
+  let matchesContext = null;
+
+  if (extractedName) {
+    const lookup = await lookupUserByName(extractedName);
+    if (lookup && lookup.count > 0) {
+      pendingMatches = lookup.matches;
+      awaitingVerification = true;
+      // Build context for Maurice to ask verification question
+      matchesContext = lookup.matches.map(m => ({
+        name: m.name,
+        last_topic: m.last_topic || 'general questions'
+      }));
+    } else {
+      // New user - update avatar with their name
+      currentUserName = extractedName;
+      updateAvatarUI();
+    }
+  }
+
+  isLoading = true;
+  sendBtn.disabled = true;
+  showTyping();
+
+  try {
+    // Build request body
+    const requestBody = { message: text, user_id: userId };
+
+    // Add potential matches for Maurice to verify
+    if (matchesContext) {
+      requestBody.potential_matches = matchesContext;
+    }
+
+    const res = await fetch(`${API_HOST}/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    hideTyping();
+
+    // Create bot message container for streaming
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message bot';
+    messageDiv.innerHTML = `
+      <div class="message-label">Maurice</div>
+      <div class="message-text"></div>
+    `;
+    messages.appendChild(messageDiv);
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    const textDiv = messageDiv.querySelector('.message-text');
+    let fullResponse = '';
+    let lastScrollTime = 0;
+
+    // Read the stream
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') {
+            break;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.token) {
+              fullResponse += parsed.token;
+              textDiv.innerHTML = formatResponse(fullResponse);
+              // Throttle scroll to every 300ms to avoid jank
+              const now = Date.now();
+              if (now - lastScrollTime > 300) {
+                messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                lastScrollTime = now;
+              }
+            }
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+          } catch (e) {
+            // Skip malformed JSON
+          }
+        }
+      }
+    }
+    // Final scroll after streaming completes
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    // Track bot response
+    if (fullResponse) {
+      conversationMessages.push({ role: 'assistant', content: fullResponse });
+      // Save conversation after each response
+      saveConversation();
+    }
+
+    // Check for images after streaming completes
+    const image = getImageForTopic(fullResponse);
+    if (image) {
+      const clickable = image.panel ? 'data-panel="' + encodeURIComponent(JSON.stringify(image.panel)) + '"' : '';
+      const clickClass = image.panel ? 'clickable' : '';
+      const imageHtml = `
+        <div class="message-image-wrapper ${clickClass}" ${clickable}>
+          <img src="${image.src}" alt="${image.alt}" class="message-image" onerror="this.parentElement.style.display='none'">
+          <div class="message-image-meta">
+            <span class="message-image-category">${image.category}</span>
+            <span class="message-image-caption">${image.alt}${image.panel ? ' ›' : ''}</span>
+          </div>
+        </div>
+      `;
+      textDiv.insertAdjacentHTML('afterend', imageHtml);
+    }
+
+  } catch (err) {
+    console.error('Stream error:', err);
+    hideTyping();
+    addMessage("Sorry, there are a lot of people talking in my ear at once. Try again in a moment?", 'bot');
+  } finally {
+    isLoading = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+// Format response text (convert newlines, etc.)
+function formatResponse(text) {
+  // Format quotes first, then add entity links, then paragraph formatting
+  return formatQuotes(addEntityLinks(text))
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/^/, '<p>')
+    .replace(/$/, '</p>');
+}
+
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('input', autoResize);
+
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+input.focus();
+
+// Slideout panel functionality
+const slideoutOverlay = document.getElementById('slideoutOverlay');
+const slideoutPanel = document.getElementById('slideoutPanel');
+const slideoutTitle = document.getElementById('slideoutTitle');
+const slideoutContent = document.getElementById('slideoutContent');
+const slideoutClose = document.getElementById('slideoutClose');
+
+function openPanel(panelData) {
+  slideoutTitle.textContent = panelData.title;
+  slideoutContent.innerHTML = panelData.content;
+  slideoutOverlay.classList.add('active');
+  slideoutPanel.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePanel() {
+  slideoutOverlay.classList.remove('active');
+  slideoutPanel.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+slideoutClose.addEventListener('click', closePanel);
+slideoutOverlay.addEventListener('click', closePanel);
+
+// Handle clicks on images with panels
+document.addEventListener('click', (e) => {
+  const wrapper = e.target.closest('.message-image-wrapper.clickable');
+  if (wrapper && wrapper.dataset.panel) {
+    const panelData = JSON.parse(decodeURIComponent(wrapper.dataset.panel));
+    openPanel(panelData);
+  }
+
+  // Handle inline text links
+  const inlineLink = e.target.closest('.inline-link');
+  if (inlineLink && inlineLink.dataset.panelKey) {
+    const key = inlineLink.dataset.panelKey;
+    // Use global panels object (not getPanels() which is async)
+    if (panels[key]) {
+      openPanel(panels[key]);
+    }
+  }
+});
+
+// Panels now loaded from /static/panels.js and /static/panels.json
+
+// Left menu functionality
+const menuToggleTitle = document.getElementById('menuToggleTitle');
+const menuOverlay = document.getElementById('menuOverlay');
+const menuPanel = document.getElementById('menuPanel');
+const menuClose = document.getElementById('menuClose');
+const menuItems = document.querySelectorAll('.menu-item');
+
+function openMenu() {
+  menuOverlay.classList.add('active');
+  menuPanel.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMenu() {
+  menuOverlay.classList.remove('active');
+  menuPanel.classList.remove('active');
+  if (!slideoutPanel.classList.contains('active')) {
+    document.body.style.overflow = '';
+  }
+}
+
+menuToggleTitle.addEventListener('click', openMenu);
+menuClose.addEventListener('click', closeMenu);
+menuOverlay.addEventListener('click', closeMenu);
+
+menuItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const key = item.dataset.panelKey;
+    // Menu panels (who/what/why) load from panels.json
+    const menuPanels = getPanels();
+    if (menuPanels[key]) {
+      closeMenu();
+      setTimeout(() => openPanel(menuPanels[key]), 150);
+    }
+  });
+});
+
+// Close panel with Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closePanel();
+});
