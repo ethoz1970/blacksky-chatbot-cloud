@@ -14,13 +14,13 @@ import time
 import json
 import re
 import uuid
+import hashlib
 from datetime import datetime, timedelta
 
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
 import jwt
-from passlib.hash import bcrypt as _bcrypt
-bcrypt = _bcrypt.using(truncate_error=False)  # Auto-truncate passwords >72 bytes
+from passlib.hash import bcrypt
 
 from chatbot import BlackskyChatbot
 from config import (
@@ -1540,6 +1540,15 @@ class LoginRequest(BaseModel):
     current_user_id: Optional[str] = None
 
 
+def prehash_password(password: str) -> str:
+    """Pre-hash password with SHA256 to ensure it fits bcrypt's 72-byte limit.
+
+    SHA256 hex digest is always 64 characters (64 bytes ASCII), well under
+    bcrypt's 72-byte limit. This is a common pattern called 'prehashing'.
+    """
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+
 @app.post("/auth/verify")
 async def verify_auth_token(request: AuthTokenRequest):
     """Verify auth token and return user info."""
@@ -1611,8 +1620,8 @@ async def register(request: RegisterRequest):
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already taken")
 
-        # Hash password (bcrypt configured to auto-truncate >72 bytes)
-        password_hash = bcrypt.hash(request.password)
+        # Hash password (prehash with SHA256 to avoid bcrypt's 72-byte limit)
+        password_hash = bcrypt.hash(prehash_password(request.password))
 
         # Create new user
         user_id = str(uuid.uuid4())
@@ -1654,8 +1663,8 @@ async def login(request: LoginRequest):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
-        # Verify password (bcrypt configured to auto-truncate >72 bytes)
-        if not user.get('password_hash') or not bcrypt.verify(request.password, user['password_hash']):
+        # Verify password (prehash with SHA256 to match registration)
+        if not user.get('password_hash') or not bcrypt.verify(prehash_password(request.password), user['password_hash']):
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         user_id = user['id']
