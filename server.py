@@ -93,6 +93,22 @@ def run_migrations():
         except Exception:
             pass  # Index may already exist
 
+        # Local auth columns
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)
+        """))
+        session.execute(text("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)
+        """))
+
+        # Add unique index on username (ignore if exists)
+        try:
+            session.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)
+            """))
+        except Exception:
+            pass  # Index may already exist
+
         session.commit()
         print("Database migrations complete.")
     except Exception as e:
