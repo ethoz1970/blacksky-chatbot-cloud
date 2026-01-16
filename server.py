@@ -19,7 +19,8 @@ from datetime import datetime, timedelta
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
 import jwt
-from passlib.hash import bcrypt
+from passlib.hash import bcrypt as _bcrypt
+bcrypt = _bcrypt.using(truncate_error=False)  # Auto-truncate passwords >72 bytes
 
 from chatbot import BlackskyChatbot
 from config import (
@@ -1610,9 +1611,8 @@ async def register(request: RegisterRequest):
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already taken")
 
-        # Hash password (truncate to 72 bytes - bcrypt limit)
-        password_bytes = request.password.encode('utf-8')[:72]
-        password_hash = bcrypt.hash(password_bytes)
+        # Hash password (bcrypt configured to auto-truncate >72 bytes)
+        password_hash = bcrypt.hash(request.password)
 
         # Create new user
         user_id = str(uuid.uuid4())
@@ -1654,9 +1654,8 @@ async def login(request: LoginRequest):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
-        # Verify password (truncate to 72 bytes - bcrypt limit)
-        password_bytes = request.password.encode('utf-8')[:72]
-        if not user.get('password_hash') or not bcrypt.verify(password_bytes, user['password_hash']):
+        # Verify password (bcrypt configured to auto-truncate >72 bytes)
+        if not user.get('password_hash') or not bcrypt.verify(request.password, user['password_hash']):
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         user_id = user['id']
