@@ -820,3 +820,82 @@ def get_user_dashboard(user_id: str) -> Optional[dict]:
         return None
     finally:
         session.close()
+
+
+def get_all_messages(limit: int = 500, offset: int = 0) -> dict:
+    """Get all messages across all conversations for traffic view."""
+    session = get_session()
+    if session is None:
+        return {"messages": [], "total": 0, "unique_users": 0}
+
+    try:
+        from datetime import timedelta
+
+        # Get total count of conversations
+        total_conversations = session.query(Conversation).count()
+
+        # Get unique users with conversations
+        unique_users = session.query(Conversation.user_id).distinct().count()
+
+        # Get messages from today
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_conversations = session.query(Conversation).filter(
+            Conversation.created_at >= today_start
+        ).count()
+
+        # Get all conversations with user info, ordered by newest first
+        conversations = (
+            session.query(Conversation, User)
+            .join(User, Conversation.user_id == User.id)
+            .order_by(Conversation.created_at.desc())
+            .all()
+        )
+
+        # Flatten messages from all conversations
+        all_messages = []
+        for conv, user in conversations:
+            if not conv.messages:
+                continue
+
+            messages = conv.messages
+            # Pair up user messages with assistant responses
+            i = 0
+            while i < len(messages):
+                msg = messages[i]
+                if msg.get("role") == "user":
+                    question = msg.get("content", "")
+                    answer = ""
+                    # Look for the next assistant message
+                    if i + 1 < len(messages) and messages[i + 1].get("role") == "assistant":
+                        answer = messages[i + 1].get("content", "")
+                        i += 1  # Skip the assistant message in next iteration
+
+                    all_messages.append({
+                        "user_id": str(user.id),
+                        "user_name": user.name or "Anonymous",
+                        "user_email": user.email or "",
+                        "question": question,
+                        "answer": answer,
+                        "timestamp": conv.created_at.isoformat() if conv.created_at else None,
+                        "conversation_id": conv.id
+                    })
+                i += 1
+
+        # Sort by timestamp (newest first) and apply pagination
+        all_messages.sort(key=lambda x: x["timestamp"] or "", reverse=True)
+        paginated = all_messages[offset:offset + limit]
+
+        return {
+            "messages": paginated,
+            "total": len(all_messages),
+            "total_conversations": total_conversations,
+            "unique_users": unique_users,
+            "today_count": today_conversations
+        }
+    except Exception as e:
+        print(f"Error getting all messages: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"messages": [], "total": 0, "unique_users": 0}
+    finally:
+        session.close()

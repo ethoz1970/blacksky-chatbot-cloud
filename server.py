@@ -30,7 +30,7 @@ from database import (
     get_user_context, get_leads, lookup_users_by_name, link_users,
     get_lead_details, update_lead_status, update_lead_notes, get_user_conversations,
     delete_user, get_analytics, get_user_by_google_id, create_google_user, link_google_account,
-    get_user_dashboard
+    get_user_dashboard, get_all_messages
 )
 
 # Paths
@@ -681,6 +681,7 @@ async def admin_dashboard(password: str = Query(None)):
                     <span class="cloud-badge">CLOUD</span>
                 </div>
                 <div class="actions">
+                    <a href="/admin/traffic?password={password}" class="btn" style="text-decoration: none;">View Traffic</a>
                     <button class="btn btn-primary" onclick="exportCSV()">Export CSV</button>
                 </div>
             </div>
@@ -1025,6 +1026,260 @@ async def clear_all_data(password: str = Query(...)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         session.close()
+
+
+@app.get("/admin/traffic")
+async def admin_traffic(password: str = Query(None), page: int = Query(1)):
+    """Traffic log showing all Q&A exchanges."""
+    if password != ADMIN_PASSWORD:
+        return HTMLResponse("""
+            <html>
+            <head><title>Traffic Log</title></head>
+            <body style="font-family: monospace; background: #0a0a0a; color: #e0e0e0; padding: 40px;">
+                <h1>Traffic Log</h1>
+                <form method="get">
+                    <input type="password" name="password" placeholder="Password"
+                           style="padding: 8px; font-family: monospace; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333;">
+                    <button type="submit" style="padding: 8px 16px; font-family: monospace; background: #333; color: #e0e0e0; border: none; cursor: pointer;">
+                        Enter
+                    </button>
+                </form>
+            </body>
+            </html>
+        """)
+
+    # Pagination
+    per_page = 50
+    offset = (page - 1) * per_page
+
+    # Get messages
+    data = get_all_messages(limit=per_page, offset=offset)
+    messages = data.get("messages", [])
+    total = data.get("total", 0)
+    total_conversations = data.get("total_conversations", 0)
+    unique_users = data.get("unique_users", 0)
+    today_count = data.get("today_count", 0)
+
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+    # Build message rows
+    rows = ""
+    for msg in messages:
+        timestamp = msg.get("timestamp", "")[:19].replace("T", " ") if msg.get("timestamp") else "-"
+        user_name = msg.get("user_name", "Anonymous")
+        user_email = msg.get("user_email", "")
+        question = msg.get("question", "")[:200]
+        answer = msg.get("answer", "")[:300]
+
+        # Escape HTML
+        question = question.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+        answer = answer.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+        user_name = user_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        rows += f"""
+        <tr class="msg-row" onclick="this.classList.toggle('expanded')">
+            <td style="white-space: nowrap;">{timestamp}</td>
+            <td>
+                <div style="font-weight: 500;">{user_name}</div>
+                <div style="font-size: 0.75rem; color: #666;">{user_email}</div>
+            </td>
+            <td class="question-cell">{question}</td>
+            <td class="answer-cell">{answer}</td>
+        </tr>
+        """
+
+    # Pagination controls
+    pagination = ""
+    if total_pages > 1:
+        pagination = '<div class="pagination">'
+        if page > 1:
+            pagination += f'<a href="?password={password}&page={page-1}">← Prev</a>'
+        pagination += f'<span>Page {page} of {total_pages}</span>'
+        if page < total_pages:
+            pagination += f'<a href="?password={password}&page={page+1}">Next →</a>'
+        pagination += '</div>'
+
+    html = f"""
+    <html>
+    <head>
+        <title>Traffic Log - Maurice</title>
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+        <style>
+            body {{
+                font-family: 'IBM Plex Mono', monospace;
+                background: #0a0a0a;
+                color: #e0e0e0;
+                padding: 40px;
+                margin: 0;
+            }}
+            .header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+            }}
+            h1 {{
+                margin: 0;
+                font-size: 1.5rem;
+            }}
+            .nav-link {{
+                color: #68d;
+                text-decoration: none;
+            }}
+            .nav-link:hover {{
+                text-decoration: underline;
+            }}
+            .stats-bar {{
+                display: flex;
+                gap: 30px;
+                padding: 15px 0;
+                border-bottom: 1px solid #222;
+                margin-bottom: 20px;
+            }}
+            .stat {{
+                text-align: center;
+            }}
+            .stat-value {{
+                font-size: 1.5rem;
+                font-weight: 500;
+                color: #6d6;
+            }}
+            .stat-label {{
+                font-size: 0.7rem;
+                color: #666;
+                text-transform: uppercase;
+            }}
+            .search-bar {{
+                margin-bottom: 20px;
+            }}
+            .search-bar input {{
+                padding: 8px 12px;
+                font-family: inherit;
+                font-size: 0.875rem;
+                background: #1a1a1a;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                width: 300px;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+            }}
+            th {{
+                text-align: left;
+                padding: 12px 8px;
+                border-bottom: 1px solid #333;
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                color: #666;
+            }}
+            td {{
+                padding: 12px 8px;
+                border-bottom: 1px solid #1a1a1a;
+                vertical-align: top;
+                font-size: 0.875rem;
+            }}
+            .msg-row {{
+                cursor: pointer;
+            }}
+            .msg-row:hover {{
+                background: #1a1a1a;
+            }}
+            .question-cell, .answer-cell {{
+                max-width: 300px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }}
+            .msg-row.expanded .question-cell,
+            .msg-row.expanded .answer-cell {{
+                white-space: normal;
+                max-width: none;
+            }}
+            .answer-cell {{
+                color: #888;
+            }}
+            .pagination {{
+                display: flex;
+                gap: 20px;
+                align-items: center;
+                justify-content: center;
+                padding: 20px 0;
+            }}
+            .pagination a {{
+                color: #68d;
+                text-decoration: none;
+                padding: 8px 16px;
+                border: 1px solid #333;
+            }}
+            .pagination a:hover {{
+                background: #1a1a1a;
+            }}
+            .pagination span {{
+                color: #666;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Traffic Log</h1>
+            <a href="/admin?password={password}" class="nav-link">← Back to Leads</a>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-value">{total}</div>
+                <div class="stat-label">Total Messages</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{unique_users}</div>
+                <div class="stat-label">Unique Users</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{total_conversations}</div>
+                <div class="stat-label">Conversations</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{today_count}</div>
+                <div class="stat-label">Today</div>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Search messages..." onkeyup="filterTable()">
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>User</th>
+                    <th>Question</th>
+                    <th>Answer</th>
+                </tr>
+            </thead>
+            <tbody id="msgTable">
+                {rows}
+            </tbody>
+        </table>
+
+        {pagination}
+
+        <script>
+            function filterTable() {{
+                const search = document.getElementById('searchInput').value.toLowerCase();
+                const rows = document.querySelectorAll('#msgTable .msg-row');
+                rows.forEach(row => {{
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(search) ? '' : 'none';
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+    return HTMLResponse(html)
 
 
 # ============================================================
