@@ -1029,7 +1029,7 @@ async def clear_all_data(password: str = Query(...)):
 
 
 @app.get("/admin/traffic")
-async def admin_traffic(password: str = Query(None), page: int = Query(1)):
+async def admin_traffic(password: str = Query(None), page: int = Query(1), user_id: str = Query(None)):
     """Traffic log showing all Q&A exchanges."""
     if password != ADMIN_PASSWORD:
         return HTMLResponse("""
@@ -1052,15 +1052,26 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
     per_page = 50
     offset = (page - 1) * per_page
 
-    # Get messages
-    data = get_all_messages(limit=per_page, offset=offset)
+    # Get messages (with optional user filter)
+    data = get_all_messages(limit=per_page, offset=offset, user_id=user_id)
     messages = data.get("messages", [])
     total = data.get("total", 0)
     total_conversations = data.get("total_conversations", 0)
     unique_users = data.get("unique_users", 0)
     today_count = data.get("today_count", 0)
+    users_list = data.get("users", [])
 
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+    # Build user filter dropdown options
+    user_options = '<option value="">All Users</option>'
+    for u in users_list:
+        selected = 'selected' if u["id"] == user_id else ''
+        display_name = u["name"]
+        if u["email"]:
+            display_name += f' ({u["email"]})'
+        display_name = display_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        user_options += f'<option value="{u["id"]}" {selected}>{display_name}</option>'
 
     # Build message rows
     rows = ""
@@ -1088,15 +1099,16 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
         </tr>
         """
 
-    # Pagination controls
+    # Pagination controls (preserve user filter in links)
+    user_param = f'&user_id={user_id}' if user_id else ''
     pagination = ""
     if total_pages > 1:
         pagination = '<div class="pagination">'
         if page > 1:
-            pagination += f'<a href="?password={password}&page={page-1}">← Prev</a>'
+            pagination += f'<a href="?password={password}&page={page-1}{user_param}">← Prev</a>'
         pagination += f'<span>Page {page} of {total_pages}</span>'
         if page < total_pages:
-            pagination += f'<a href="?password={password}&page={page+1}">Next →</a>'
+            pagination += f'<a href="?password={password}&page={page+1}{user_param}">Next →</a>'
         pagination += '</div>'
 
     html = f"""
@@ -1151,15 +1163,23 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
             }}
             .search-bar {{
                 margin-bottom: 20px;
+                display: flex;
+                gap: 12px;
+                align-items: center;
             }}
-            .search-bar input {{
+            .search-bar input, .search-bar select {{
                 padding: 8px 12px;
                 font-family: inherit;
                 font-size: 0.875rem;
                 background: #1a1a1a;
                 color: #e0e0e0;
                 border: 1px solid #333;
+            }}
+            .search-bar input {{
                 width: 300px;
+            }}
+            .search-bar select {{
+                min-width: 200px;
             }}
             table {{
                 width: 100%;
@@ -1246,6 +1266,9 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
         </div>
 
         <div class="search-bar">
+            <select id="userFilter" onchange="filterByUser()">
+                {user_options}
+            </select>
             <input type="text" id="searchInput" placeholder="Search messages..." onkeyup="filterTable()">
         </div>
 
@@ -1273,6 +1296,15 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
                     const text = row.textContent.toLowerCase();
                     row.style.display = text.includes(search) ? '' : 'none';
                 }});
+            }}
+
+            function filterByUser() {{
+                const userId = document.getElementById('userFilter').value;
+                let url = '?password={password}&page=1';
+                if (userId) {{
+                    url += '&user_id=' + userId;
+                }}
+                window.location.href = url;
             }}
         </script>
     </body>

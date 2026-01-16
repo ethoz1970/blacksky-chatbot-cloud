@@ -822,11 +822,11 @@ def get_user_dashboard(user_id: str) -> Optional[dict]:
         session.close()
 
 
-def get_all_messages(limit: int = 500, offset: int = 0) -> dict:
+def get_all_messages(limit: int = 500, offset: int = 0, user_id: Optional[str] = None) -> dict:
     """Get all messages across all conversations for traffic view."""
     session = get_session()
     if session is None:
-        return {"messages": [], "total": 0, "unique_users": 0}
+        return {"messages": [], "total": 0, "unique_users": 0, "users": []}
 
     try:
         from datetime import timedelta
@@ -843,13 +843,25 @@ def get_all_messages(limit: int = 500, offset: int = 0) -> dict:
             Conversation.created_at >= today_start
         ).count()
 
-        # Get all conversations with user info, ordered by newest first
-        conversations = (
-            session.query(Conversation, User)
-            .join(User, Conversation.user_id == User.id)
-            .order_by(Conversation.created_at.desc())
+        # Get list of users for dropdown filter
+        users_with_convs = (
+            session.query(User)
+            .join(Conversation, User.id == Conversation.user_id)
+            .distinct()
+            .order_by(User.name)
             .all()
         )
+        users_list = [{"id": str(u.id), "name": u.name or "Anonymous", "email": u.email or ""} for u in users_with_convs]
+
+        # Build query for conversations
+        query = session.query(Conversation, User).join(User, Conversation.user_id == User.id)
+
+        # Apply user filter if specified
+        if user_id:
+            query = query.filter(Conversation.user_id == user_id)
+
+        # Get all conversations with user info, ordered by newest first
+        conversations = query.order_by(Conversation.created_at.desc()).all()
 
         # Flatten messages from all conversations
         all_messages = []
@@ -890,12 +902,13 @@ def get_all_messages(limit: int = 500, offset: int = 0) -> dict:
             "total": len(all_messages),
             "total_conversations": total_conversations,
             "unique_users": unique_users,
-            "today_count": today_conversations
+            "today_count": today_conversations,
+            "users": users_list
         }
     except Exception as e:
         print(f"Error getting all messages: {e}")
         import traceback
         traceback.print_exc()
-        return {"messages": [], "total": 0, "unique_users": 0}
+        return {"messages": [], "total": 0, "unique_users": 0, "users": []}
     finally:
         session.close()
