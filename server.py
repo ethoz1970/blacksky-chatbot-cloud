@@ -15,12 +15,12 @@ import json
 import re
 import uuid
 import hashlib
+import secrets
 from datetime import datetime, timedelta
 
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
 import jwt
-from passlib.hash import bcrypt
 
 from chatbot import BlackskyChatbot
 from config import (
@@ -1529,7 +1529,7 @@ class AuthTokenRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     username: str
-    email: str
+    email: Optional[str] = None  # Email is optional
     password: str
     current_user_id: Optional[str] = None
 
@@ -1540,13 +1540,34 @@ class LoginRequest(BaseModel):
     current_user_id: Optional[str] = None
 
 
-def prehash_password(password: str) -> str:
-    """Pre-hash password with SHA256 to ensure it fits bcrypt's 72-byte limit.
+def hash_password(password: str) -> str:
+    """Hash password using PBKDF2-SHA256. No length limit.
 
-    SHA256 hex digest is always 64 characters (64 bytes ASCII), well under
-    bcrypt's 72-byte limit. This is a common pattern called 'prehashing'.
+    Returns: salt$hash format string for storage.
     """
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    salt = secrets.token_hex(16)  # 32 char hex salt
+    hash_bytes = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt.encode('utf-8'),
+        100000  # iterations (OWASP recommended minimum)
+    )
+    return f"{salt}${hash_bytes.hex()}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """Verify password against stored hash."""
+    try:
+        salt, hash_hex = stored_hash.split('$')
+        hash_bytes = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            salt.encode('utf-8'),
+            100000
+        )
+        return secrets.compare_digest(hash_bytes.hex(), hash_hex)
+    except Exception:
+        return False
 
 
 @app.post("/auth/verify")
@@ -1607,8 +1628,8 @@ async def register(request: RegisterRequest):
         if not re.match(r'^[a-zA-Z0-9_]+$', request.username):
             raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, and underscores")
 
-        # Validate email format
-        if not re.match(r'^[^@]+@[^@]+\.[^@]+$', request.email):
+        # Validate email format (only if provided)
+        if request.email and not re.match(r'^[^@]+@[^@]+\.[^@]+$', request.email):
             raise HTTPException(status_code=400, detail="Invalid email format")
 
         # Validate password
@@ -1620,8 +1641,8 @@ async def register(request: RegisterRequest):
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already taken")
 
-        # Hash password (prehash with SHA256 to avoid bcrypt's 72-byte limit)
-        password_hash = bcrypt.hash(prehash_password(request.password))
+        # Hash password using PBKDF2 (no length limit)
+        password_hash = hash_password(request.password)
 
         # Create new user
         user_id = str(uuid.uuid4())
@@ -1663,8 +1684,8 @@ async def login(request: LoginRequest):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
-        # Verify password (prehash with SHA256 to match registration)
-        if not user.get('password_hash') or not bcrypt.verify(prehash_password(request.password), user['password_hash']):
+        # Verify password using PBKDF2
+        if not user.get('password_hash') or not verify_password(request.password, user['password_hash']):
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
         user_id = user['id']

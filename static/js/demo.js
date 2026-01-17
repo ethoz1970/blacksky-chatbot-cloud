@@ -235,7 +235,7 @@ function showAuthModal(mode) {
   if (mode === 'register') {
     authModalTitle.textContent = 'Create Account';
     authEmailGroup.style.display = 'block';
-    authEmail.required = true;
+    authEmail.required = false;  // Email is optional
     authSubmit.textContent = 'Create Account';
     authToggleText.textContent = 'Already have an account?';
     authToggleLink.textContent = 'Sign In';
