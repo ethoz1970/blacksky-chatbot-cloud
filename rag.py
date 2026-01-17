@@ -10,7 +10,8 @@ from chromadb.utils import embedding_functions
 
 # Configuration
 DOCS_DIR = Path(__file__).parent / "documents"
-CHROMA_DIR = Path(__file__).parent / "chroma_db"
+# ChromaDB path - configurable for Railway persistent volumes
+CHROMA_DIR = Path(os.getenv("CHROMA_DIR", str(Path(__file__).parent / "chroma_db")))
 COLLECTION_NAME = "blacksky_docs"
 CHUNK_SIZE = 500  # characters per chunk
 CHUNK_OVERLAP = 50  # overlap between chunks

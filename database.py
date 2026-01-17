@@ -1,7 +1,8 @@
 """
 Database models and functions for Maurice memory system.
-Local SQLite version for development/testing.
+Supports SQLite (local) and PostgreSQL (production).
 """
+import os
 import json
 import bcrypt
 from datetime import datetime
@@ -11,9 +12,10 @@ from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, F
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-# Local SQLite database
+# Database URL from environment (Railway provides DATABASE_URL for PostgreSQL)
+# Falls back to local SQLite for development
 DATABASE_PATH = Path(__file__).parent / "maurice.db"
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATABASE_PATH}")
 
 # SQLAlchemy setup
 Base = declarative_base()
@@ -87,12 +89,30 @@ def init_db():
     global engine, SessionLocal
 
     try:
-        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+        # SQLite needs check_same_thread=False, PostgreSQL needs pooling
+        if DATABASE_URL.startswith("sqlite"):
+            engine = create_engine(
+                DATABASE_URL,
+                connect_args={"check_same_thread": False}
+            )
+            db_type = "SQLite"
+            db_location = str(DATABASE_PATH)
+        else:
+            # PostgreSQL or other production database
+            engine = create_engine(
+                DATABASE_URL,
+                pool_size=5,
+                max_overflow=10,
+                pool_pre_ping=True  # Verify connections before use
+            )
+            db_type = "PostgreSQL"
+            db_location = DATABASE_URL.split("@")[-1].split("/")[0] if "@" in DATABASE_URL else "remote"
+
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
         # Create tables if they don't exist
         Base.metadata.create_all(bind=engine)
-        print(f"SQLite database ready: {DATABASE_PATH}")
+        print(f"{db_type} database ready: {db_location}")
         return True
     except Exception as e:
         print(f"Database connection failed: {e}")

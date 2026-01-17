@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Local development files
+models/
+*.gguf
+maurice.db
+chroma_db/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation
+*.md
+!documents/*.md
+
+# Tests
+tests/
+pytest.ini
+.pytest_cache/
+
+# Misc
+.DS_Store
+*.log

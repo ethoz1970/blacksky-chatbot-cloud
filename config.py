@@ -52,7 +52,11 @@ REPEAT_PENALTY = 1.1
 
 # Server settings
 HOST = "0.0.0.0"
-PORT = 8000
+PORT = int(os.getenv("PORT", 8000))  # Railway sets PORT dynamically
+
+# CORS settings - comma-separated list of allowed origins
+# Use "*" for development, specific domains for production
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # Conversation settings
 MAX_HISTORY_TURNS = 4  # Keep last N exchanges to manage context size

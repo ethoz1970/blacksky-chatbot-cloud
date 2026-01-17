@@ -1,0 +1,13 @@
+# Production dependencies (no llama-cpp-python - using Together.ai API)
+openai>=1.0.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-dotenv>=1.0.0
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+python-multipart>=0.0.6
+PyJWT>=2.8.0
+bcrypt>=4.0.0
+httpx>=0.25.0

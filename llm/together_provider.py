@@ -12,7 +12,7 @@ class TogetherLlamaProvider(LlamaProvider):
 
     def __init__(self):
         self.client = None
-        self.model = "meta-llama/Llama-3.1-8B-Instruct-Turbo"
+        self.model = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
 
     def load(self) -> None:
         """Initialize the Together.ai client."""

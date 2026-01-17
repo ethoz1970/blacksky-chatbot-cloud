@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 import jwt
 
 from chatbot import BlackskyChatbot
-from config import HOST, PORT, ADMIN_PASSWORD, JWT_SECRET_KEY
+from config import HOST, PORT, ADMIN_PASSWORD, JWT_SECRET_KEY, CORS_ORIGINS
 from rag import DocumentStore, DOCS_DIR
 from database import (
     init_db, get_or_create_user, update_user, save_conversation, update_conversation,
@@ -64,10 +64,11 @@ app = FastAPI(
 )
 
 # CORS for web clients
+# In production, set CORS_ORIGINS to specific domains (e.g., "https://yourdomain.com")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True if CORS_ORIGINS != ["*"] else False,  # Credentials only with specific origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -143,15 +144,17 @@ async def root():
 async def db_health():
     """Database health check."""
     from sqlalchemy import text
-    from database import get_session
+    from database import get_session, DATABASE_URL
 
     session = get_session()
     if session is None:
         return {"status": "disabled", "reason": "Database not initialized"}
 
+    db_type = "postgresql" if DATABASE_URL.startswith("postgresql") else "sqlite"
+
     try:
         session.execute(text("SELECT 1"))
-        return {"status": "connected", "database": "sqlite"}
+        return {"status": "connected", "database": db_type}
     except Exception as e:
         return {"status": "error", "reason": str(e)}
     finally:
