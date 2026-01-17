@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# LLM Provider: "local" (llama-cpp) or "together" (Together.ai API)
+LLAMA_PROVIDER = os.getenv("LLAMA_PROVIDER", "local")
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
+
 # Detect platform
 IS_MAC = platform.system() == "Darwin"
 IS_ARM_LINUX = platform.system() == "Linux" and platform.machine() == "aarch64"

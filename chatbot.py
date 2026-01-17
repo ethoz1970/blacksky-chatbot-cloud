@@ -1,45 +1,27 @@
 """
-Core chatbot logic using llama-cpp-python
+Core chatbot logic with support for local and cloud Llama providers.
 """
-from llama_cpp import Llama
+from llm import create_llama_provider
 from config import (
-    MODEL_PATH, N_GPU_LAYERS, N_THREADS, N_CTX, N_BATCH,
-    MAX_TOKENS, TEMPERATURE, TOP_P, REPEAT_PENALTY, MAX_HISTORY_TURNS
+    MAX_TOKENS, TEMPERATURE, TOP_P, REPEAT_PENALTY, MAX_HISTORY_TURNS, N_CTX, N_GPU_LAYERS
 )
 from prompts import SYSTEM_PROMPT
-from download_model import download_model
 from rag import DocumentStore
 
 
 class BlackskyChatbot:
-    """Chatbot wrapper around TinyLlama with conversation management."""
-    
+    """Chatbot wrapper with support for local and cloud Llama providers."""
+
     def __init__(self, use_rag: bool = True):
-        self.model = None
+        self.llm = None
         self.conversation_history = []
         self.use_rag = use_rag
         self.doc_store = None
-        
+
     def load_model(self):
-        """Load the model into memory."""
-        if not MODEL_PATH.exists():
-            print("Model not found locally, downloading...")
-            download_model()
-        
-        print(f"Loading model from {MODEL_PATH}...")
-        print(f"  GPU layers: {N_GPU_LAYERS}")
-        print(f"  Threads: {N_THREADS}")
-        print(f"  Context: {N_CTX}")
-        
-        self.model = Llama(
-            model_path=str(MODEL_PATH),
-            n_gpu_layers=N_GPU_LAYERS,
-            n_threads=N_THREADS,
-            n_ctx=N_CTX,
-            n_batch=N_BATCH,
-            verbose=False
-        )
-        print("✓ Model loaded successfully!")
+        """Load the LLM provider (local or cloud)."""
+        self.llm = create_llama_provider()
+        self.llm.load()
         
         # Initialize RAG if enabled
         if self.use_rag:
@@ -121,37 +103,34 @@ class BlackskyChatbot:
         """
         Generate a response to the user's message.
         """
-        if self.model is None:
+        if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
         prompt = self._build_prompt(user_message, user_context, potential_matches)
-        
+
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")
-        
-        # Generate response
-        output = self.model(
-            prompt,
+
+        # Generate response via provider
+        response = self.llm.chat(
+            prompt=prompt,
             max_tokens=MAX_TOKENS,
             temperature=TEMPERATURE,
             top_p=TOP_P,
             repeat_penalty=REPEAT_PENALTY,
-            stop=["<|eot_id|>", "<|start_header_id|>"],
-            echo=False
+            stop=["<|eot_id|>", "<|start_header_id|>"]
         )
-        
-        response = output["choices"][0]["text"].strip()
-        
+
         # Debug: log response
         print(f"[DEBUG] Response length: {len(response)} chars")
         print(f"[DEBUG] Response: {repr(response[:200])}")
-        
+
         # Store in history
         self.conversation_history.append({
             "user": user_message,
             "assistant": response
         })
-        
+
         return response
     
     def chat_stream(self, user_message: str, user_context: dict = None, potential_matches: list = None):
@@ -159,36 +138,33 @@ class BlackskyChatbot:
         Generate a streaming response to the user's message.
         Yields tokens as they are generated.
         """
-        if self.model is None:
+        if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
         prompt = self._build_prompt(user_message, user_context, potential_matches)
-        
+
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")
-        
-        # Generate response with streaming
+
+        # Generate response with streaming via provider
         full_response = ""
-        for output in self.model(
-            prompt,
+        for token in self.llm.chat_stream(
+            prompt=prompt,
             max_tokens=MAX_TOKENS,
             temperature=TEMPERATURE,
             top_p=TOP_P,
             repeat_penalty=REPEAT_PENALTY,
-            stop=["<|eot_id|>", "<|start_header_id|>"],
-            echo=False,
-            stream=True
+            stop=["<|eot_id|>", "<|start_header_id|>"]
         ):
-            token = output["choices"][0]["text"]
             full_response += token
             yield token
-        
+
         # Store in history after streaming completes
         self.conversation_history.append({
             "user": user_message,
             "assistant": full_response.strip()
         })
-        
+
         print(f"[DEBUG] Response length: {len(full_response)} chars")
     
     def clear_history(self):
@@ -198,13 +174,18 @@ class BlackskyChatbot:
     
     def get_stats(self) -> dict:
         """Return current stats."""
+        import os
+        provider = os.getenv("LLAMA_PROVIDER", "local")
         stats = {
             "history_turns": len(self.conversation_history),
             "max_history": MAX_HISTORY_TURNS,
-            "context_size": N_CTX,
-            "gpu_layers": N_GPU_LAYERS,
+            "provider": provider,
             "rag_enabled": self.use_rag
         }
+        # Add local-specific stats
+        if provider == "local":
+            stats["context_size"] = N_CTX
+            stats["gpu_layers"] = N_GPU_LAYERS
         if self.use_rag and self.doc_store:
             stats["indexed_chunks"] = self.doc_store.collection.count()
             stats["indexed_documents"] = len(self.doc_store.list_documents())
