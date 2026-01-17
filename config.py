@@ -1,6 +1,6 @@
 """
 Configuration for Blacksky Chatbot (Cloud Version)
-Uses Anthropic Claude for LLM and Pinecone for vector storage
+Uses Together AI (Llama) for LLM and Pinecone for vector storage
 """
 import os
 from pathlib import Path
@@ -12,6 +12,7 @@ load_dotenv()
 # Together AI settings (Llama 3.1 70B)
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 TOGETHER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
+TOGETHER_FAST_MODEL = "meta-llama/Llama-3.2-3B-Instruct-Turbo"  # For helper tasks
 TOGETHER_BASE_URL = "https://api.together.xyz/v1"
 
 # Pinecone settings

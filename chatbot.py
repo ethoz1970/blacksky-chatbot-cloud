@@ -3,9 +3,12 @@ Core chatbot logic using Together AI (Llama 3.1 70B)
 """
 from openai import OpenAI
 
+import json
+
 from config import (
     TOGETHER_API_KEY,
     TOGETHER_MODEL,
+    TOGETHER_FAST_MODEL,
     TOGETHER_BASE_URL,
     MAX_TOKENS,
     MAX_HISTORY_TURNS
@@ -15,13 +18,14 @@ from rag import DocumentStore
 
 
 class BlackskyChatbot:
-    """Chatbot wrapper using Anthropic Claude for inference."""
+    """Chatbot wrapper using Together AI (Llama) for inference."""
 
     def __init__(self, use_rag: bool = True):
         self.client = None
         self.conversation_history = []
         self.use_rag = use_rag
         self.doc_store = None
+        self.session_context = {}  # Track user info learned this session
 
     def initialize(self):
         """Initialize Together AI client and RAG."""
@@ -87,16 +91,82 @@ class BlackskyChatbot:
 
         return "\n\nUSER CONTEXT:\n" + "\n".join(parts)
 
+    def _extract_session_insights(self, user_message: str, assistant_response: str):
+        """Extract key user info from exchange using fast model."""
+        prompt = """Extract any NEW user information from this exchange. Return valid JSON only:
+{"name": null, "company": null, "industry": null, "interests": [], "pain_points": []}
+Only include non-null/non-empty values for info actually stated. Return {} if nothing new.
+
+User: """ + user_message + """
+Assistant: """ + assistant_response
+
+        try:
+            response = self.client.chat.completions.create(
+                model=TOGETHER_FAST_MODEL,
+                max_tokens=150,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            result = response.choices[0].message.content.strip()
+
+            # Try to parse JSON from response
+            # Handle cases where model wraps in markdown code blocks
+            if "```" in result:
+                result = result.split("```")[1]
+                if result.startswith("json"):
+                    result = result[4:]
+
+            insights = json.loads(result)
+
+            # Merge insights into session_context
+            if insights.get("name"):
+                self.session_context["name"] = insights["name"]
+            if insights.get("company"):
+                self.session_context["company"] = insights["company"]
+            if insights.get("industry"):
+                self.session_context["industry"] = insights["industry"]
+            if insights.get("interests"):
+                existing = self.session_context.get("interests", [])
+                self.session_context["interests"] = list(set(existing + insights["interests"]))
+            if insights.get("pain_points"):
+                existing = self.session_context.get("pain_points", [])
+                self.session_context["pain_points"] = list(set(existing + insights["pain_points"]))
+
+        except Exception as e:
+            # Silent fail - extraction is optional enhancement
+            print(f"Session insight extraction failed: {e}")
+
+    def _build_session_context_prompt(self) -> str:
+        """Build context string from info learned this session."""
+        if not self.session_context:
+            return ""
+
+        parts = ["SESSION INFO (learned this conversation):"]
+        if self.session_context.get("name"):
+            parts.append(f"  Name: {self.session_context['name']}")
+        if self.session_context.get("company"):
+            parts.append(f"  Company: {self.session_context['company']}")
+        if self.session_context.get("industry"):
+            parts.append(f"  Industry: {self.session_context['industry']}")
+        if self.session_context.get("interests"):
+            parts.append(f"  Interests: {', '.join(self.session_context['interests'])}")
+        if self.session_context.get("pain_points"):
+            parts.append(f"  Pain points: {', '.join(self.session_context['pain_points'])}")
+
+        if len(parts) == 1:
+            return ""
+
+        return "\n\n" + "\n".join(parts)
+
     def chat(self, user_message: str, user_context: dict = None, potential_matches: list = None) -> str:
         """Generate a response to the user's message."""
         if self.client is None:
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
-        # Get RAG context if enabled
+        # Get RAG context if enabled (pass history for query expansion)
         rag_context = ""
         if self.use_rag and self.doc_store:
             try:
-                rag_context = self.doc_store.get_context(user_message)
+                rag_context = self.doc_store.get_context(user_message, history=self.conversation_history)
             except Exception as e:
                 print(f"RAG error: {e}")
 
@@ -108,6 +178,11 @@ class BlackskyChatbot:
         context_prompt = self._build_user_context_prompt(user_context, potential_matches)
         if context_prompt:
             system_content += context_prompt
+
+        # Add session context (info learned this conversation)
+        session_prompt = self._build_session_context_prompt()
+        if session_prompt:
+            system_content += session_prompt
 
         # Build messages array (OpenAI format - system message first)
         messages = [{"role": "system", "content": system_content}]
@@ -135,18 +210,21 @@ class BlackskyChatbot:
             "assistant": assistant_message
         })
 
+        # Extract insights from this exchange for future context
+        self._extract_session_insights(user_message, assistant_message)
+
         return assistant_message
-    
+
     def chat_stream(self, user_message: str, user_context: dict = None, potential_matches: list = None):
         """Generate a streaming response to the user's message."""
         if self.client is None:
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
-        # Get RAG context if enabled
+        # Get RAG context if enabled (pass history for query expansion)
         rag_context = ""
         if self.use_rag and self.doc_store:
             try:
-                rag_context = self.doc_store.get_context(user_message)
+                rag_context = self.doc_store.get_context(user_message, history=self.conversation_history)
             except Exception as e:
                 print(f"RAG error: {e}")
 
@@ -158,6 +236,11 @@ class BlackskyChatbot:
         context_prompt = self._build_user_context_prompt(user_context, potential_matches)
         if context_prompt:
             system_content += context_prompt
+
+        # Add session context (info learned this conversation)
+        session_prompt = self._build_session_context_prompt()
+        if session_prompt:
+            system_content += session_prompt
 
         # Build messages array (OpenAI format - system message first)
         messages = [{"role": "system", "content": system_content}]
@@ -189,10 +272,14 @@ class BlackskyChatbot:
             "user": user_message,
             "assistant": full_response.strip()
         })
-    
+
+        # Extract insights from this exchange for future context
+        self._extract_session_insights(user_message, full_response.strip())
+
     def clear_history(self):
-        """Clear conversation history."""
+        """Clear conversation history and session context."""
         self.conversation_history = []
+        self.session_context = {}
         return "Conversation cleared. Fresh start!"
     
     def get_stats(self) -> dict:

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 from pinecone import Pinecone, ServerlessSpec
 from sentence_transformers import SentenceTransformer
+from openai import OpenAI
 
 from config import (
     PINECONE_API_KEY,
@@ -15,7 +16,10 @@ from config import (
     DOCS_DIR,
     CHUNK_SIZE,
     CHUNK_OVERLAP,
-    TOP_K
+    TOP_K,
+    TOGETHER_API_KEY,
+    TOGETHER_FAST_MODEL,
+    TOGETHER_BASE_URL
 )
 
 
@@ -26,6 +30,7 @@ class DocumentStore:
         self.pc = None
         self.index = None
         self.encoder = None
+        self.llm_client = None  # For query expansion
         
     def initialize(self):
         """Initialize Pinecone and embedding model."""
@@ -58,7 +63,14 @@ class DocumentStore:
             )
         
         self.index = self.pc.Index(PINECONE_INDEX_NAME)
-        
+
+        # Initialize LLM client for query expansion
+        if TOGETHER_API_KEY:
+            self.llm_client = OpenAI(
+                api_key=TOGETHER_API_KEY,
+                base_url=TOGETHER_BASE_URL
+            )
+
         # Get stats
         stats = self.index.describe_index_stats()
         print(f"✓ Document store ready. {stats.total_vector_count} vectors indexed.")
@@ -171,17 +183,48 @@ class DocumentStore:
         
         return chunks
     
-    def get_context(self, query: str, top_k: int = TOP_K) -> str:
+    def expand_query(self, query: str, history: list = None) -> str:
+        """Use LLM to generate better search terms for retrieval."""
+        if not self.llm_client:
+            return query
+
+        try:
+            context = ""
+            if history:
+                context = "\n".join([f"User: {t['user']}" for t in history[-2:]])
+
+            prompt = f"""Given this query, generate 3-5 search keywords to find relevant company/service info.
+Return keywords only, comma-separated. No explanation.
+
+Context: {context}
+Query: {query}
+Keywords:"""
+
+            response = self.llm_client.chat.completions.create(
+                model=TOGETHER_FAST_MODEL,
+                max_tokens=50,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            keywords = response.choices[0].message.content.strip()
+            # Combine original query with expanded keywords
+            return f"{query} {keywords}"
+        except Exception as e:
+            print(f"Query expansion failed: {e}")
+            return query
+
+    def get_context(self, query: str, top_k: int = TOP_K, history: list = None) -> str:
         """Get formatted context string for injection into prompt."""
-        chunks = self.search(query, top_k)
-        
+        # Expand query for better retrieval
+        expanded_query = self.expand_query(query, history)
+        chunks = self.search(expanded_query, top_k)
+
         if not chunks:
             return ""
-        
+
         context_parts = ["Reference information (use naturally, do not copy formatting):"]
         for chunk in chunks:
             context_parts.append(chunk['text'])
-        
+
         return "\n\n".join(context_parts)
     
     def get_stats(self) -> dict:
