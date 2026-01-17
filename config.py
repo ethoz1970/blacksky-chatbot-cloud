@@ -9,9 +9,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Anthropic settings
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
+# Together AI settings (Llama 3.1 70B)
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
+TOGETHER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
+TOGETHER_BASE_URL = "https://api.together.xyz/v1"
 
 # Pinecone settings
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
