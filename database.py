@@ -1121,12 +1121,8 @@ def get_all_users(
         return {"users": [], "total": 0, "page": 1, "total_pages": 0}
 
     try:
-        # Base query with conversation and fact counts
-        query = session.query(
-            User,
-            func.count(Conversation.id).label('conversation_count'),
-            func.count(UserFact.id.distinct()).label('fact_count')
-        ).outerjoin(Conversation).outerjoin(UserFact).group_by(User.id)
+        # Build base query for users
+        query = session.query(User)
 
         # Apply filters
         if auth_method:
@@ -1156,14 +1152,46 @@ def get_all_users(
         elif sort_by == 'created_at':
             query = query.order_by(sort_func(User.created_at))
         elif sort_by == 'conversations':
-            query = query.order_by(sort_func('conversation_count'))
+            # For conversation sorting, we need a subquery
+            conv_count = session.query(
+                Conversation.user_id,
+                func.count(Conversation.id).label('conv_count')
+            ).group_by(Conversation.user_id).subquery()
+            query = query.outerjoin(conv_count, User.id == conv_count.c.user_id)
+            query = query.order_by(sort_func(func.coalesce(conv_count.c.conv_count, 0)))
         else:  # default: last_seen
             query = query.order_by(sort_func(User.last_seen))
 
         # Apply pagination
         query = query.offset(offset).limit(limit)
 
-        results = query.all()
+        users_list = query.all()
+
+        # Get conversation and fact counts for each user
+        user_ids = [u.id for u in users_list]
+
+        # Batch query for conversation counts
+        conv_counts = {}
+        if user_ids:
+            conv_results = session.query(
+                Conversation.user_id,
+                func.count(Conversation.id)
+            ).filter(Conversation.user_id.in_(user_ids)).group_by(Conversation.user_id).all()
+            conv_counts = {uid: count for uid, count in conv_results}
+
+        # Batch query for fact counts
+        fact_counts = {}
+        if user_ids:
+            fact_results = session.query(
+                UserFact.user_id,
+                func.count(UserFact.id)
+            ).filter(UserFact.user_id.in_(user_ids)).group_by(UserFact.user_id).all()
+            fact_counts = {uid: count for uid, count in fact_results}
+
+        # Build results
+        results = []
+        for user in users_list:
+            results.append((user, conv_counts.get(user.id, 0), fact_counts.get(user.id, 0)))
 
         users = []
         for user, conv_count, fact_count in results:
