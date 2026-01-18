@@ -27,7 +27,8 @@ from database import (
     get_user_context, get_leads, lookup_users_by_name, link_users,
     get_lead_details, update_lead_status, update_lead_notes, get_user_conversations,
     delete_user, get_analytics, get_user_dashboard, get_user_by_name, create_hard_user,
-    verify_hard_login, get_all_exchanges, save_user_facts, get_user_facts
+    verify_hard_login, get_all_exchanges, save_user_facts, get_user_facts,
+    get_all_users, get_user_full_profile
 )
 
 # Paths
@@ -723,7 +724,9 @@ async def admin_dashboard(password: str = Query(None)):
                     <span class="local-badge">LOCAL</span>
                 </div>
                 <div class="actions">
-                    <a href="/admin/traffic?password={password}" class="btn" style="margin-right: 10px; text-decoration: none;">View Traffic</a>
+                    <a href="/admin?password={password}" class="btn" style="text-decoration: none; background: #1a1a1a; border-color: #68d;">Leads</a>
+                    <a href="/admin/users?password={password}" class="btn" style="text-decoration: none;">Users</a>
+                    <a href="/admin/traffic?password={password}" class="btn" style="text-decoration: none;">Traffic</a>
                     <button class="btn btn-primary" onclick="exportCSV()">Export CSV</button>
                 </div>
             </div>
@@ -1105,7 +1108,11 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
             <div class="header">
                 <div>
                     <h1>Maurice's Traffic Dashboard <span class="local-badge">LOCAL</span></h1>
-                    <a href="/admin?password={password}" class="back-link">&larr; Back to Leads</a>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/admin?password={password}" style="color: #68d; text-decoration: none; padding: 8px 16px; border: 1px solid #333; border-radius: 4px;">Leads</a>
+                    <a href="/admin/users?password={password}" style="color: #68d; text-decoration: none; padding: 8px 16px; border: 1px solid #333; border-radius: 4px;">Users</a>
+                    <a href="/admin/traffic?password={password}" style="color: #68d; text-decoration: none; padding: 8px 16px; border: 1px solid #68d; border-radius: 4px; background: #1a1a1a;">Traffic</a>
                 </div>
             </div>
 
@@ -1153,6 +1160,456 @@ async def admin_traffic_data(password: str = Query(...), page: int = Query(1)):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     return get_all_exchanges(page=page, per_page=50)
+
+
+@app.get("/admin/users")
+async def admin_users(
+    password: str = Query(None),
+    auth: str = Query(None),
+    status: str = Query(None),
+    search: str = Query(None),
+    sort: str = Query('last_seen'),
+    page: int = Query(1)
+):
+    """Admin users dashboard - view and manage all users."""
+    # Show login form if no password
+    if not password:
+        return HTMLResponse("""
+            <html>
+            <head><title>Admin Users - Login</title></head>
+            <body style="font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; background: #0a0a0a;">
+                <form style="background: #1a1a1a; padding: 40px; border-radius: 10px; color: #e0e0e0; border: 1px solid #333;">
+                    <h2>Users Dashboard Login</h2>
+                    <input type="password" name="password" placeholder="Password" style="padding: 10px; width: 200px; margin: 10px 0; background: #0d0d0d; color: #e0e0e0; border: 1px solid #333;">
+                    <button type="submit" style="padding: 10px 20px; background: #333; color: #e0e0e0; border: none; cursor: pointer;">Login</button>
+                </form>
+            </body>
+            </html>
+        """)
+
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    # Get paginated users
+    per_page = 50
+    offset = (page - 1) * per_page
+    data = get_all_users(
+        auth_method=auth if auth != 'all' else None,
+        status=status if status != 'all' else None,
+        search=search,
+        sort_by=sort,
+        sort_order='desc',
+        limit=per_page,
+        offset=offset
+    )
+
+    # Build table rows
+    rows = ""
+    for user in data['users']:
+        # Auth badge
+        auth_method = user.get('auth_method', 'soft')
+        if user.get('name', '').startswith('ANON['):
+            auth_badge = '<span class="auth-badge auth-anon" title="Anonymous">?</span>'
+        elif auth_method == 'medium':
+            auth_badge = '<span class="auth-badge auth-hard" title="Hard Login">H</span>'
+        elif auth_method == 'google':
+            auth_badge = '<span class="auth-badge auth-google" title="Google">G</span>'
+        else:
+            auth_badge = '<span class="auth-badge auth-soft" title="Soft Login">S</span>'
+
+        # Status color
+        status_val = user.get('status') or 'new'
+        status_colors = {"new": "#666", "contacted": "#68d", "qualified": "#da6", "converted": "#6d6", "archived": "#888"}
+        status_color = status_colors.get(status_val, "#666")
+
+        # Format last seen
+        last_seen = user.get('last_seen', '')[:10] if user.get('last_seen') else '-'
+
+        name = user.get('name') or '-'
+        email = user.get('email') or '-'
+        company = user.get('company') or '-'
+
+        rows += f"""
+            <tr class="user-row" data-id="{user['id']}">
+                <td>{auth_badge}</td>
+                <td class="clickable" onclick="showUserDetail('{user['id']}')">{name}</td>
+                <td>{email}</td>
+                <td>{company}</td>
+                <td style="color: {status_color};">{status_val}</td>
+                <td>{user.get('conversation_count', 0)}</td>
+                <td>{user.get('fact_count', 0)}</td>
+                <td>{last_seen}</td>
+            </tr>
+        """
+
+    # Build pagination
+    prev_disabled = "disabled" if page <= 1 else ""
+    next_disabled = "disabled" if page >= data['total_pages'] else ""
+
+    # Build query string for pagination
+    query_params = f"password={password}"
+    if auth:
+        query_params += f"&auth={auth}"
+    if status:
+        query_params += f"&status={status}"
+    if search:
+        query_params += f"&search={search}"
+    if sort:
+        query_params += f"&sort={sort}"
+
+    return HTMLResponse(f"""
+        <html>
+        <head>
+            <title>Maurice's Users Dashboard</title>
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{ font-family: 'IBM Plex Mono', monospace; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; padding: 30px; }}
+                .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
+                .header h1 {{ font-size: 1.4rem; font-weight: normal; color: #888; }}
+                .local-badge {{ background: #2a4a2a; color: #6f6; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px; }}
+                .nav-links {{ display: flex; gap: 10px; }}
+                .nav-links a {{ color: #68d; text-decoration: none; padding: 8px 16px; border: 1px solid #333; border-radius: 4px; }}
+                .nav-links a:hover {{ background: #1a1a1a; }}
+                .nav-links a.active {{ background: #1a1a1a; border-color: #68d; }}
+                .filters {{ display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }}
+                .filter-group {{ display: flex; align-items: center; gap: 8px; }}
+                .filter-group label {{ color: #666; font-size: 0.8rem; }}
+                .filter-input {{ padding: 8px 12px; font-family: monospace; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; }}
+                .filter-input:focus {{ outline: none; border-color: #555; }}
+                .stats-bar {{ display: flex; gap: 20px; padding: 15px 0; margin-bottom: 15px; }}
+                .stat {{ text-align: center; }}
+                .stat-value {{ font-size: 1.3rem; font-weight: bold; color: #68d; }}
+                .stat-label {{ font-size: 0.7rem; color: #666; text-transform: uppercase; }}
+                table {{ border-collapse: collapse; width: 100%; background: #111; border-radius: 8px; overflow: hidden; }}
+                th {{ background: #1a1a1a; padding: 12px; text-align: left; font-weight: normal; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.1em; color: #666; }}
+                td {{ padding: 12px; border-bottom: 1px solid #222; }}
+                tr:hover {{ background: #1a1a1a; }}
+                .clickable {{ cursor: pointer; }}
+                .clickable:hover {{ text-decoration: underline; color: #68d; }}
+                .auth-badge {{ display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 0.75rem; font-weight: bold; }}
+                .auth-hard {{ background: #2a4a2a; color: #6d6; }}
+                .auth-soft {{ background: #2a3a4a; color: #68d; }}
+                .auth-google {{ background: #4a3a2a; color: #da6; }}
+                .auth-anon {{ background: #333; color: #666; }}
+                .pagination {{ display: flex; justify-content: center; align-items: center; gap: 20px; padding: 20px; }}
+                .pagination button {{ padding: 8px 16px; background: #333; color: #e0e0e0; border: none; border-radius: 4px; cursor: pointer; font-family: monospace; }}
+                .pagination button:disabled {{ background: #222; color: #555; cursor: not-allowed; }}
+                .pagination button:hover:not(:disabled) {{ background: #444; }}
+                .modal {{ display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; overflow-y: auto; }}
+                .modal-content {{ background: #1a1a1a; margin: 3% auto; padding: 30px; width: 90%; max-width: 900px; border-radius: 8px; border: 1px solid #333; }}
+                .modal-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #333; }}
+                .modal-close {{ font-size: 24px; cursor: pointer; color: #666; }}
+                .modal-close:hover {{ color: #fff; }}
+                .user-profile {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }}
+                .profile-field {{ }}
+                .profile-label {{ font-size: 0.7rem; color: #666; text-transform: uppercase; margin-bottom: 4px; }}
+                .profile-value {{ color: #e0e0e0; }}
+                .section-title {{ font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin: 20px 0 10px; padding-bottom: 5px; border-bottom: 1px solid #333; }}
+                .fact-item {{ display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #222; }}
+                .fact-type {{ color: #68d; }}
+                .fact-value {{ color: #e0e0e0; }}
+                .fact-confidence {{ color: #666; font-size: 0.8rem; }}
+                .conversation-item {{ background: #111; border-radius: 4px; padding: 15px; margin-bottom: 10px; }}
+                .conversation-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }}
+                .conversation-date {{ color: #666; }}
+                .conversation-score {{ padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }}
+                .score-high {{ background: #2a4a2a; color: #6d6; }}
+                .score-med {{ background: #4a4a2a; color: #aa4; }}
+                .score-low {{ background: #333; color: #666; }}
+                .message {{ padding: 8px 12px; margin: 4px 0; border-radius: 4px; font-size: 0.9rem; }}
+                .message-user {{ background: #1a2a3a; border-left: 3px solid #68d; }}
+                .message-assistant {{ background: #1a1a1a; border-left: 3px solid #666; }}
+                .message-role {{ font-size: 0.7rem; color: #666; margin-bottom: 4px; }}
+                .stats-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }}
+                .stat-card {{ background: #111; padding: 15px; border-radius: 4px; text-align: center; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <h1>Maurice's Users Dashboard <span class="local-badge">LOCAL</span></h1>
+                </div>
+                <div class="nav-links">
+                    <a href="/admin?password={password}">Leads</a>
+                    <a href="/admin/users?password={password}" class="active">Users</a>
+                    <a href="/admin/traffic?password={password}">Traffic</a>
+                </div>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat">
+                    <div class="stat-value">{data['total']}</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Auth:</label>
+                    <select class="filter-input" id="authFilter" onchange="applyFilters()">
+                        <option value="all" {"selected" if not auth or auth == "all" else ""}>All</option>
+                        <option value="anonymous" {"selected" if auth == "anonymous" else ""}>Anonymous</option>
+                        <option value="soft" {"selected" if auth == "soft" else ""}>Soft Login</option>
+                        <option value="medium" {"selected" if auth == "medium" else ""}>Hard Login</option>
+                        <option value="google" {"selected" if auth == "google" else ""}>Google</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Status:</label>
+                    <select class="filter-input" id="statusFilter" onchange="applyFilters()">
+                        <option value="all" {"selected" if not status or status == "all" else ""}>All</option>
+                        <option value="new" {"selected" if status == "new" else ""}>New</option>
+                        <option value="contacted" {"selected" if status == "contacted" else ""}>Contacted</option>
+                        <option value="qualified" {"selected" if status == "qualified" else ""}>Qualified</option>
+                        <option value="converted" {"selected" if status == "converted" else ""}>Converted</option>
+                        <option value="archived" {"selected" if status == "archived" else ""}>Archived</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Sort:</label>
+                    <select class="filter-input" id="sortFilter" onchange="applyFilters()">
+                        <option value="last_seen" {"selected" if sort == "last_seen" else ""}>Last Seen</option>
+                        <option value="created_at" {"selected" if sort == "created_at" else ""}>Created</option>
+                        <option value="name" {"selected" if sort == "name" else ""}>Name</option>
+                        <option value="conversations" {"selected" if sort == "conversations" else ""}>Conversations</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Search:</label>
+                    <input type="text" class="filter-input" id="searchInput" value="{search or ''}" placeholder="Name, email, company..." style="width: 200px;">
+                    <button class="filter-input" onclick="applyFilters()" style="cursor: pointer;">Search</button>
+                </div>
+                <div style="color: #666; font-size: 0.85rem;">
+                    Showing {len(data['users'])} of {data['total']}
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Auth</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Company</th>
+                        <th>Status</th>
+                        <th style="width: 80px;">Conv</th>
+                        <th style="width: 80px;">Facts</th>
+                        <th style="width: 100px;">Last Seen</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTable">
+                    {rows if rows else '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #666;">No users found</td></tr>'}
+                </tbody>
+            </table>
+
+            <div class="pagination">
+                <button onclick="goToPage({page - 1})" {prev_disabled}>&lt; Prev</button>
+                <span>Page {data['page']} of {data['total_pages']}</span>
+                <button onclick="goToPage({page + 1})" {next_disabled}>Next &gt;</button>
+            </div>
+
+            <!-- User Detail Modal -->
+            <div id="userModal" class="modal" onclick="if(event.target===this)closeModal()">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="modalTitle">User Details</h2>
+                        <span class="modal-close" onclick="closeModal()">&times;</span>
+                    </div>
+                    <div id="modalBody">Loading...</div>
+                </div>
+            </div>
+
+            <script>
+                const PASSWORD = '{password}';
+
+                function applyFilters() {{
+                    const auth = document.getElementById('authFilter').value;
+                    const status = document.getElementById('statusFilter').value;
+                    const sort = document.getElementById('sortFilter').value;
+                    const search = document.getElementById('searchInput').value;
+
+                    let url = `/admin/users?password=${{PASSWORD}}`;
+                    if (auth && auth !== 'all') url += `&auth=${{auth}}`;
+                    if (status && status !== 'all') url += `&status=${{status}}`;
+                    if (sort) url += `&sort=${{sort}}`;
+                    if (search) url += `&search=${{encodeURIComponent(search)}}`;
+
+                    window.location.href = url;
+                }}
+
+                function goToPage(page) {{
+                    const auth = document.getElementById('authFilter').value;
+                    const status = document.getElementById('statusFilter').value;
+                    const sort = document.getElementById('sortFilter').value;
+                    const search = document.getElementById('searchInput').value;
+
+                    let url = `/admin/users?password=${{PASSWORD}}&page=${{page}}`;
+                    if (auth && auth !== 'all') url += `&auth=${{auth}}`;
+                    if (status && status !== 'all') url += `&status=${{status}}`;
+                    if (sort) url += `&sort=${{sort}}`;
+                    if (search) url += `&search=${{encodeURIComponent(search)}}`;
+
+                    window.location.href = url;
+                }}
+
+                async function showUserDetail(userId) {{
+                    document.getElementById('userModal').style.display = 'block';
+                    document.getElementById('modalBody').innerHTML = 'Loading...';
+
+                    try {{
+                        const resp = await fetch(`/admin/users/${{userId}}?password=${{PASSWORD}}`);
+                        if (!resp.ok) throw new Error('Failed to load user');
+                        const data = await resp.json();
+
+                        const user = data.user;
+                        document.getElementById('modalTitle').textContent = user.name || 'Unknown User';
+
+                        // Build profile HTML
+                        let html = `
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-value">${{data.stats.total_conversations}}</div>
+                                    <div class="stat-label">Conversations</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${{data.stats.total_messages}}</div>
+                                    <div class="stat-label">Messages</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${{data.stats.avg_lead_score}}</div>
+                                    <div class="stat-label">Avg Score</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">${{data.stats.days_since_first_contact}}</div>
+                                    <div class="stat-label">Days Active</div>
+                                </div>
+                            </div>
+
+                            <div class="user-profile">
+                                <div class="profile-field">
+                                    <div class="profile-label">Email</div>
+                                    <div class="profile-value">${{user.email || '-'}}</div>
+                                </div>
+                                <div class="profile-field">
+                                    <div class="profile-label">Phone</div>
+                                    <div class="profile-value">${{user.phone || '-'}}</div>
+                                </div>
+                                <div class="profile-field">
+                                    <div class="profile-label">Company</div>
+                                    <div class="profile-value">${{user.company || '-'}}</div>
+                                </div>
+                                <div class="profile-field">
+                                    <div class="profile-label">Auth Method</div>
+                                    <div class="profile-value">${{user.auth_method || 'soft'}}</div>
+                                </div>
+                                <div class="profile-field">
+                                    <div class="profile-label">Status</div>
+                                    <div class="profile-value">${{user.status || 'new'}}</div>
+                                </div>
+                                <div class="profile-field">
+                                    <div class="profile-label">Interest Level</div>
+                                    <div class="profile-value">${{user.interest_level || '-'}}</div>
+                                </div>
+                                <div class="profile-field">
+                                    <div class="profile-label">First Contact</div>
+                                    <div class="profile-value">${{user.created_at ? user.created_at.slice(0,10) : '-'}}</div>
+                                </div>
+                                <div class="profile-field">
+                                    <div class="profile-label">Last Seen</div>
+                                    <div class="profile-value">${{user.last_seen ? user.last_seen.slice(0,10) : '-'}}</div>
+                                </div>
+                            </div>
+                        `;
+
+                        // Facts section
+                        if (data.facts && data.facts.length > 0) {{
+                            html += '<div class="section-title">Extracted Facts</div>';
+                            for (const fact of data.facts) {{
+                                const confidence = Math.round(fact.confidence * 100);
+                                html += `
+                                    <div class="fact-item">
+                                        <span class="fact-type">${{fact.type}}</span>
+                                        <span class="fact-value">${{fact.value}}</span>
+                                        <span class="fact-confidence">${{confidence}}%</span>
+                                    </div>
+                                `;
+                            }}
+                        }}
+
+                        // Conversations section
+                        if (data.conversations && data.conversations.length > 0) {{
+                            html += '<div class="section-title">Conversation History</div>';
+                            for (const conv of data.conversations) {{
+                                const scoreClass = conv.lead_score >= 3 ? 'score-high' : conv.lead_score >= 2 ? 'score-med' : 'score-low';
+                                const date = conv.created_at ? conv.created_at.slice(0,10) : 'Unknown';
+
+                                html += `
+                                    <div class="conversation-item">
+                                        <div class="conversation-header">
+                                            <span class="conversation-date">${{date}} (${{conv.message_count}} messages)</span>
+                                            <span class="conversation-score ${{scoreClass}}">Score: ${{conv.lead_score}}</span>
+                                        </div>
+                                `;
+
+                                if (conv.messages && conv.messages.length > 0) {{
+                                    for (const msg of conv.messages.slice(0, 10)) {{
+                                        const roleClass = msg.role === 'user' ? 'message-user' : 'message-assistant';
+                                        const roleLabel = msg.role === 'user' ? 'User' : 'Maurice';
+                                        const content = msg.content.length > 300 ? msg.content.slice(0, 300) + '...' : msg.content;
+                                        html += `
+                                            <div class="message ${{roleClass}}">
+                                                <div class="message-role">${{roleLabel}}</div>
+                                                ${{content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}}
+                                            </div>
+                                        `;
+                                    }}
+                                    if (conv.messages.length > 10) {{
+                                        html += `<div style="color: #666; text-align: center; padding: 10px;">... ${{conv.messages.length - 10}} more messages</div>`;
+                                    }}
+                                }}
+
+                                html += '</div>';
+                            }}
+                        }} else {{
+                            html += '<div style="color: #666; padding: 20px; text-align: center;">No conversations yet</div>';
+                        }}
+
+                        document.getElementById('modalBody').innerHTML = html;
+
+                    }} catch (e) {{
+                        document.getElementById('modalBody').innerHTML = `<div style="color: #f66;">Error loading user: ${{e.message}}</div>`;
+                    }}
+                }}
+
+                function closeModal() {{
+                    document.getElementById('userModal').style.display = 'none';
+                }}
+
+                document.addEventListener('keydown', (e) => {{
+                    if (e.key === 'Escape') closeModal();
+                }});
+
+                // Enter key in search
+                document.getElementById('searchInput').addEventListener('keypress', (e) => {{
+                    if (e.key === 'Enter') applyFilters();
+                }});
+            </script>
+        </body>
+        </html>
+    """)
+
+
+@app.get("/admin/users/{user_id}")
+async def admin_user_detail(user_id: str, password: str = Query(...)):
+    """Get full user profile for admin modal."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    profile = get_user_full_profile(user_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return profile
 
 
 @app.get("/admin/lead/{user_id}")

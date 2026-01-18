@@ -1084,3 +1084,217 @@ def delete_user_fact(fact_id: int) -> bool:
         return False
     finally:
         session.close()
+
+
+# ============================================
+# Admin Users Dashboard Functions
+# ============================================
+
+def get_all_users(
+    auth_method: str = None,
+    status: str = None,
+    search: str = None,
+    sort_by: str = 'last_seen',
+    sort_order: str = 'desc',
+    limit: int = 100,
+    offset: int = 0
+) -> dict:
+    """
+    Get all users with filtering, sorting, and pagination for admin dashboard.
+
+    Args:
+        auth_method: Filter by 'soft', 'medium', 'google', or None for all
+        status: Filter by user status
+        search: Search in name, email, company
+        sort_by: 'last_seen', 'created_at', 'name', 'conversations'
+        sort_order: 'asc' or 'desc'
+        limit: Max results per page
+        offset: Skip first N results
+
+    Returns:
+        Dict with users list, total count, and pagination info
+    """
+    from sqlalchemy import func, desc, asc
+
+    session = get_session()
+    if session is None:
+        return {"users": [], "total": 0, "page": 1, "total_pages": 0}
+
+    try:
+        # Base query with conversation and fact counts
+        query = session.query(
+            User,
+            func.count(Conversation.id).label('conversation_count'),
+            func.count(UserFact.id.distinct()).label('fact_count')
+        ).outerjoin(Conversation).outerjoin(UserFact).group_by(User.id)
+
+        # Apply filters
+        if auth_method:
+            if auth_method == 'anonymous':
+                query = query.filter(User.name.like('ANON[%'))
+            else:
+                query = query.filter(User.auth_method == auth_method)
+
+        if status:
+            query = query.filter(User.status == status)
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                (User.name.ilike(search_pattern)) |
+                (User.email.ilike(search_pattern)) |
+                (User.company.ilike(search_pattern))
+            )
+
+        # Get total count before pagination
+        total = query.count()
+
+        # Apply sorting
+        sort_func = desc if sort_order == 'desc' else asc
+        if sort_by == 'name':
+            query = query.order_by(sort_func(User.name))
+        elif sort_by == 'created_at':
+            query = query.order_by(sort_func(User.created_at))
+        elif sort_by == 'conversations':
+            query = query.order_by(sort_func('conversation_count'))
+        else:  # default: last_seen
+            query = query.order_by(sort_func(User.last_seen))
+
+        # Apply pagination
+        query = query.offset(offset).limit(limit)
+
+        results = query.all()
+
+        users = []
+        for user, conv_count, fact_count in results:
+            users.append({
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "company": user.company,
+                "auth_method": user.auth_method,
+                "status": user.status or "new",
+                "interest_level": user.interest_level,
+                "notes": user.notes,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "last_seen": user.last_seen.isoformat() if user.last_seen else None,
+                "conversation_count": conv_count,
+                "fact_count": fact_count
+            })
+
+        total_pages = (total + limit - 1) // limit if limit > 0 else 1
+        current_page = (offset // limit) + 1 if limit > 0 else 1
+
+        return {
+            "users": users,
+            "total": total,
+            "page": current_page,
+            "total_pages": total_pages
+        }
+
+    except Exception as e:
+        print(f"Error getting all users: {e}")
+        return {"users": [], "total": 0, "page": 1, "total_pages": 0}
+    finally:
+        session.close()
+
+
+def get_user_full_profile(user_id: str) -> dict:
+    """
+    Get complete user profile with all facts and conversations for admin view.
+
+    Returns:
+        Dict with user info, facts, conversations, and stats
+    """
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            return None
+
+        # Get all facts
+        facts = session.query(UserFact).filter(
+            UserFact.user_id == user_id
+        ).order_by(UserFact.confidence.desc()).all()
+
+        # Get all conversations with messages
+        conversations = session.query(Conversation).filter(
+            Conversation.user_id == user_id
+        ).order_by(Conversation.created_at.desc()).all()
+
+        # Build response
+        facts_list = [
+            {
+                "type": f.fact_type,
+                "value": f.fact_value,
+                "confidence": f.confidence,
+                "source_text": f.source_text[:100] + "..." if f.source_text and len(f.source_text) > 100 else f.source_text,
+                "created_at": f.created_at.isoformat() if f.created_at else None
+            }
+            for f in facts
+        ]
+
+        conversations_list = []
+        total_messages = 0
+        lead_scores = []
+
+        for conv in conversations:
+            messages = []
+            if conv.messages:
+                try:
+                    messages = json.loads(conv.messages)
+                except:
+                    messages = []
+
+            total_messages += len(messages)
+            if conv.lead_score:
+                lead_scores.append(conv.lead_score)
+
+            conversations_list.append({
+                "id": conv.id,
+                "created_at": conv.created_at.isoformat() if conv.created_at else None,
+                "summary": conv.summary,
+                "lead_score": conv.lead_score,
+                "message_count": len(messages),
+                "messages": messages
+            })
+
+        # Calculate stats
+        avg_lead_score = sum(lead_scores) / len(lead_scores) if lead_scores else 0
+        first_contact = user.created_at
+        days_since_first = (datetime.utcnow() - first_contact).days if first_contact else 0
+
+        return {
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "company": user.company,
+                "auth_method": user.auth_method,
+                "status": user.status or "new",
+                "interest_level": user.interest_level,
+                "notes": user.notes,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "last_seen": user.last_seen.isoformat() if user.last_seen else None
+            },
+            "facts": facts_list,
+            "conversations": conversations_list,
+            "stats": {
+                "total_conversations": len(conversations_list),
+                "total_messages": total_messages,
+                "avg_lead_score": round(avg_lead_score, 1),
+                "first_contact": first_contact.isoformat() if first_contact else None,
+                "days_since_first_contact": days_since_first
+            }
+        }
+
+    except Exception as e:
+        print(f"Error getting user full profile: {e}")
+        return None
+    finally:
+        session.close()
