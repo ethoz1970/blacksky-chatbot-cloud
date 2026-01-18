@@ -151,14 +151,17 @@ Migrated two legacy ASP.NET sites to unified Drupal 9 platform.
 
 ### U.S. Department of Treasury (2020)
 
-Architected migration of 6 SharePoint sites to unified Drupal 8 platform for treasury.gov.
+Led 9-month engagement as Senior Architect, migrating 6 legacy SharePoint sites to a unified Drupal 8 platform for treasury.gov. Built custom API layer integrating legacy XML with modern JSON APIs.
 
 **Key accomplishments:**
-- Enterprise content architecture supporting 200+ content creators
-- Custom migration framework for 15,000+ documents with 98% content fidelity
-- Reduced deployment time from 3 days to 4 hours via CI/CD improvements
+- 6 SharePoint sites consolidated into 1 unified Drupal platform
+- 15,000+ documents migrated with 98% metadata fidelity
+- 200+ content creators configured with role-based access and editorial workflows
+- 92% reduction in deployment time (3 days → 4 hours) via Jenkins CI/CD
+- Custom modules for document management, data visualization, and webforms
+- Real-time data feeds connecting Treasury backend systems
 
-**Technologies**: Drupal 8, PHP, XML processing, Acquia Cloud
+**Technologies**: Drupal 8, PHP, JavaScript, SharePoint, Jenkins CI/CD, Acquia Cloud, Custom JSON/XML APIs
 
 ### U.S. Department of Transportation (2019-2020)
 

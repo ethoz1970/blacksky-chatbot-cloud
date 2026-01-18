@@ -107,27 +107,31 @@
     ]
   },
   "treasury": {
-    "title": "Treasury Project",
+    "title": "U.S. Treasury - Multi-Site Migration",
     "image": "/static/images/treasury.png",
     "content": [
       {
         "section": "Project Overview",
         "text": [
-          "Blacksky architected and executed migration of 6 mission-critical SharePoint sites to a unified Drupal 8 platform for treasury.gov, consolidating fragmented content systems into a cohesive digital ecosystem."
+          "Led 9-month engagement as Senior Architect, migrating 6 legacy SharePoint sites to a unified Drupal 8 platform for treasury.gov. Modernized Treasury's digital infrastructure while preserving complex content relationships."
+        ]
+      },
+      {
+        "section": "Migration Scope",
+        "text": [
+          "› 6 SharePoint sites consolidated into 1 unified platform\n› 15,000+ documents migrated with 98% metadata fidelity\n› 200+ content creators configured with role-based access\n› Custom API layer integrating legacy XML with modern JSON"
         ]
       },
       {
         "section": "Key Accomplishments",
         "text": [
-          "Designed enterprise content architecture supporting treasury.gov and 5 subsidiary sites, used by 200+ content creators.",
-          "Built custom migration framework successfully migrating 15,000+ documents and pages with 98% content fidelity.",
-          "Reduced deployment time from 3 days to 4 hours through CI/CD pipeline improvements."
+          "› 92% reduction in deployment time (3 days → 4 hours)\n› Custom modules for document management and data visualization\n› Editorial workflows with multi-level approval chains\n› Real-time data feeds from Treasury backend systems"
         ]
       },
       {
         "section": "Technologies",
         "text": [
-          "Drupal 8, PHP, XML processing, Acquia Cloud, custom ETL tools"
+          "Drupal 8, PHP, JavaScript, SharePoint, Jenkins CI/CD, Acquia Cloud, Custom JSON/XML APIs"
         ]
       }
     ]
