@@ -139,8 +139,17 @@ async function linkToUser(targetUserId) {
 
 // Convert entity names in text to clickable links
 function addEntityLinks(text) {
+  let matchCount = 0;
   for (const { pattern, key } of ENTITY_PATTERNS) {
+    const before = text;
     text = text.replace(pattern, `<span class="inline-link" data-panel-key="${key}">$&</span>`);
+    if (text !== before) {
+      matchCount++;
+      console.log('Entity link matched:', key);
+    }
+  }
+  if (matchCount > 0) {
+    console.log('Total entity links added:', matchCount);
   }
   return text;
 }

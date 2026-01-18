@@ -110,15 +110,15 @@
 
 /* Inline links in chat messages */
 .inline-link {
-  color: #888;
-  border-bottom: 1px solid #444;
+  color: #4a9eff;
+  border-bottom: 1px dashed #4a9eff;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
 
 .inline-link:hover {
-  color: #e0e0e0;
-  border-color: #e0e0e0;
+  color: #7bb8ff;
+  border-color: #7bb8ff;
 }
 
 /* Quote blocks */
