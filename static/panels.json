@@ -258,27 +258,31 @@
     ]
   },
   "dot": {
-    "title": "DOT Project",
+    "title": "DOT - Permitting Dashboard",
     "image": "/static/images/transportation2.png.webp",
     "content": [
       {
         "section": "Project Overview",
         "text": [
-          "Blacksky developed a comprehensive infrastructure tracking dashboard for the Department of Transportation, enabling real-time monitoring of $100M+ in federal infrastructure projects."
+          "Led 11-month engagement as Lead Backend Developer, modernizing the Office of the Secretary (OST) permitting dashboard. Combined platform migration, GIS visualization, and multi-API orchestration to create an interactive view of 500+ infrastructure projects."
+        ]
+      },
+      {
+        "section": "ARCGIS Integration",
+        "text": [
+          "› 500+ infrastructure projects displayed on interactive maps\n› Project clustering and toggleable layers by type\n› Geographic filtering by state, region, or custom boundaries\n› Click-through details linking to full project information"
         ]
       },
       {
         "section": "Key Accomplishments",
         "text": [
-          "Built interactive data visualization dashboard tracking project milestones, budgets, and completion status across multiple regions.",
-          "Implemented real-time reporting system integrating data from multiple DOT divisions.",
-          "Designed responsive interface for field engineers accessing project data on mobile devices."
+          "› Drupal 7 to Drupal 8 migration with custom modules\n› Multi-API orchestration (Socrata, ARCGIS, internal systems)\n› Data normalization across JSON, GeoJSON, WMS, CSV formats\n› Multiple DOT websites built and maintained"
         ]
       },
       {
         "section": "Technologies",
         "text": [
-          "Drupal 9, PHP, PostgreSQL, Chart.js, D3.js, AWS"
+          "Drupal 7/8, PHP, JavaScript, ARCGIS, Socrata API, GeoJSON, Acquia Cloud"
         ]
       }
     ]

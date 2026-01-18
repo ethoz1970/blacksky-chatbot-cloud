@@ -165,14 +165,17 @@ Led 9-month engagement as Senior Architect, migrating 6 legacy SharePoint sites 
 
 ### U.S. Department of Transportation (2019-2020)
 
-Architected OST permitting dashboard integrating geospatial data for infrastructure projects exceeding $100M.
+Led 11-month engagement as Lead Backend Developer, modernizing the Office of the Secretary (OST) permitting dashboard. Combined platform migration, ARCGIS visualization, and multi-API orchestration to create an interactive view of 500+ infrastructure projects across the United States.
 
 **Key accomplishments:**
-- ArcGIS integration visualizing 500+ active infrastructure projects
-- Multi-API orchestration for 15 federal and state agencies
-- Drupal 7 to 8 migration maintaining operational uptime
+- ARCGIS integration visualizing 500+ infrastructure projects on interactive maps
+- Multi-API orchestration unifying Socrata, ARCGIS, and internal systems
+- Data normalization across JSON, GeoJSON, WMS, CSV formats
+- Drupal 7 to 8 migration with custom modules
+- Geographic filtering by state, region, or custom boundaries
+- Multiple DOT websites built and maintained
 
-**Technologies**: Drupal 7/8, PHP, ArcGIS API, Socrata API, GeoJSON
+**Technologies**: Drupal 7/8, PHP, JavaScript, ARCGIS, Socrata API, GeoJSON, WMS, Acquia Cloud
 
 ### U.S. Securities and Exchange Commission (2017)
 
