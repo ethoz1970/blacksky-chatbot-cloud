@@ -4,6 +4,7 @@ const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 // Entity patterns for linking
 const ENTITY_PATTERNS = [
+  // Federal agencies
   { pattern: /\bTreasury\b/g, key: 'treasury' },
   { pattern: /\bNIH\b/g, key: 'nih' },
   { pattern: /\bFDA\b/g, key: 'fda' },
@@ -13,16 +14,25 @@ const ENTITY_PATTERNS = [
   { pattern: /\bSEC\b/g, key: 'sec' },
   { pattern: /\bHHS\b/g, key: 'hhs' },
   { pattern: /\bUSAID\b/g, key: 'usaid' },
+  // Enterprise clients
   { pattern: /\bVanguard\b/gi, key: 'vanguard' },
   { pattern: /\bMastercard\b/gi, key: 'mastercard' },
   { pattern: /\bBlue Cross\b/gi, key: 'bcbs' },
   { pattern: /\bWorld Bank\b/gi, key: 'worldbank' },
   { pattern: /\bBillboard\b/gi, key: 'billboard' },
   { pattern: /\bNational Gallery\b/gi, key: 'nga' },
+  // Technologies
   { pattern: /\bDrupal\b/gi, key: 'drupal' },
   { pattern: /\bKubernetes\b/gi, key: 'kubernetes' },
   { pattern: /\bAzure\b/gi, key: 'azure' },
   { pattern: /\bAWS\b/g, key: 'aws' },
+  // Featured projects
+  { pattern: /\bMaurice\b/g, key: 'maurice' },
+  { pattern: /\bIfe\b/g, key: 'ife' },
+  { pattern: /\bSeth\b/g, key: 'seth' },
+  { pattern: /\bPoly Sci Fi\b/gi, key: 'polyscifi' },
+  { pattern: /\bHip[- ]?Hop Voice\b/gi, key: 'hiphopvoice' },
+  { pattern: /\bVoice AI\b/gi, key: 'hiphopvoice' },
 ];
 
 // Image mappings for topics
