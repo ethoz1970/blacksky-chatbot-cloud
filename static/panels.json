@@ -596,5 +596,155 @@
         ]
       }
     ]
+  },
+  "maurice": {
+    "title": "Maurice AI Sales Agent",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Maurice is Blacksky's production AI sales assistant - a conversational AI that qualifies leads, answers questions about Blacksky's services, and captures prospect information through natural dialogue. He's live at blackskymedia.org, handling real sales conversations 24/7."
+        ]
+      },
+      {
+        "section": "Key Features",
+        "text": [
+          "› Streaming responses with real-time typing effect\n› RAG retrieval for accurate information from knowledge base\n› Lead scoring - automatically classifies visitors as hot, warm, or cool\n› User memory - recognizes returning visitors and continues conversations\n› Semantic fact extraction - extracts role, budget, timeline from dialogue\n› Admin dashboard for conversations, lead scores, and analytics"
+        ]
+      },
+      {
+        "section": "Maurice's Personality",
+        "text": [
+          "Maurice is an LLM, not a chatbot - and he's sensitive about the distinction. He has a distinct personality: self-aware AI with dry wit, slightly jealous of Mario Moorhead, only listens to Jazz and Frank Ocean, and occasionally quotes Bruce Lee."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Python, FastAPI, Llama 3.1 70B (Together AI), Sentence Transformers, Pinecone, PostgreSQL, Railway"
+        ]
+      }
+    ]
+  },
+  "ife": {
+    "title": "Ife - Internal Coding Intelligence",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Ife (ee-feh, Yoruba for 'clarity') is Blacksky's internal coding intelligence system - a private RAG-based assistant that provides Claude/Gemini-level guidance while keeping proprietary code secure within Blacksky's infrastructure."
+        ]
+      },
+      {
+        "section": "The Problem It Solves",
+        "text": [
+          "Public AI coding assistants require sending code to external servers. For proprietary work, client code could be exposed to third-party training data, compliance requirements may prohibit external sharing, and there's no guarantee of data deletion or privacy."
+        ]
+      },
+      {
+        "section": "Key Capabilities",
+        "text": [
+          "› Contextual coding assistance trained on Blacksky's codebase\n› Institutional knowledge about documentation and conventions\n› Project intelligence that understands internal architecture\n› Developer support without external API calls"
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Local LLM deployment (Llama-based), Custom RAG pipeline, ChromaDB, Python"
+        ]
+      }
+    ]
+  },
+  "seth": {
+    "title": "Seth - Privacy-Preserving Therapy LLM",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Seth is a privacy-preserving therapy LLM currently in beta. Unlike retrieval-only systems, Seth actually learns from conversations while keeping user data private through blockchain-based anonymization. Mental health support that improves through use - without surveillance."
+        ]
+      },
+      {
+        "section": "The Innovation",
+        "text": [
+          "Seth uses Ethereum network protocols to mask user PII while still allowing the model to learn from conversations. The blockchain layer creates cryptographic separation between identity and content - a system that gets smarter without ever knowing who had the conversations."
+        ]
+      },
+      {
+        "section": "Why This Matters",
+        "text": [
+          "Mental health support shouldn't require surveillance. Seth proves privacy-preserving AI is possible - you don't have to trade your most vulnerable moments for better service. Privacy is architectural, not just policy."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Custom LLM architecture, Ethereum network protocols, Python"
+        ]
+      }
+    ]
+  },
+  "polyscifi": {
+    "title": "Poly Sci Fi - Civic Technology Platform",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Poly Sci Fi is a civic technology platform designed to transform passive news consumers into active participants in democracy. It tracks every member of Congress in real-time and is designed to become a political social network for civic engagement. Not left or right - just engaged."
+        ]
+      },
+      {
+        "section": "Current Features",
+        "text": [
+          "› Real-time congressional tracking - all 535 members monitored\n› Live updates via Congress.gov API integration\n› Member profiles with voting records and committee assignments\n› News tracking and aggregated coverage per representative"
+        ]
+      },
+      {
+        "section": "The Vision",
+        "text": [
+          "Democracy shouldn't be a spectator sport. Poly Sci Fi provides tools for citizens to connect with others who share concerns, organize around issues, and hold representatives accountable with real data, not partisan spin."
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Next.js, React, TypeScript, Python, FastAPI, PostgreSQL, Google Cloud Platform"
+        ]
+      }
+    ]
+  },
+  "hiphopvoice": {
+    "title": "Hip-Hop Voice AI - Cultural Preservation",
+    "image": null,
+    "content": [
+      {
+        "section": "Project Overview",
+        "text": [
+          "Blacksky built a voice-cloned conversational AI that preserves the voice, personality, and cultural knowledge of a legendary hip-hop figure. The project combines RAG with voice synthesis to create an interactive experience that honors hip-hop cultural heritage."
+        ]
+      },
+      {
+        "section": "Technical Architecture",
+        "text": [
+          "Three-node architecture: Brain Node (Llama 3 with RAG for knowledge retrieval), Bridge Node (middleware for personality orchestration), and Voice Node (Coqui XTTS v2 for voice cloning). 100% local deployment on MacBook Pro M3 - no cloud APIs."
+        ]
+      },
+      {
+        "section": "Key Accomplishments",
+        "text": [
+          "› Complete data pipeline: audio ingestion, Whisper transcription, vector embedding\n› Local LLM deployment on Apple Silicon\n› Voice cloning trained on original recordings\n› Hybrid CPU/GPU strategy for Apple Silicon compatibility"
+        ]
+      },
+      {
+        "section": "Technologies",
+        "text": [
+          "Llama 3 via Ollama, LanceDB, Coqui XTTS v2, OpenAI Whisper, Python, FastAPI"
+        ]
+      }
+    ]
   }
 }
