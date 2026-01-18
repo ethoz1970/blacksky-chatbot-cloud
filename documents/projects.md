@@ -12,7 +12,67 @@ Blacksky LLC has delivered enterprise platforms for 18+ years.
 
 ---
 
-## Recent AI Projects
+## Featured AI Projects
+
+### Maurice - AI Sales Agent (Live)
+
+Maurice is Blacksky's production AI sales assistant - a conversational AI that qualifies leads, answers questions about services, and captures prospect information through natural dialogue. He's live at blackskymedia.org, handling real sales conversations 24/7.
+
+**Key features:**
+- Streaming responses with real-time typing
+- RAG retrieval for accurate information from knowledge base
+- Lead scoring - automatically classifies visitors as hot, warm, or cool
+- User memory - recognizes returning visitors
+- Semantic fact extraction from conversations
+
+**Technologies**: Python, FastAPI, Llama 3.1 70B (Together AI), Sentence Transformers, Pinecone, PostgreSQL, Railway
+
+### Ife - Internal Coding Intelligence
+
+Ife (Yoruba for "clarity") is Blacksky's private RAG-based coding assistant that provides Claude-level guidance while keeping proprietary code secure. Ife knows Blacksky's codebase, conventions, and architecture.
+
+**Key capabilities:**
+- Contextual coding assistance trained on Blacksky's codebase
+- Institutional knowledge about documentation and conventions
+- Developer support without external API calls
+
+**Technologies**: Local LLM (Llama-based), Custom RAG pipeline, ChromaDB, Python
+
+### Seth - Privacy-Preserving Therapy LLM (Beta)
+
+Seth is a privacy-preserving therapy LLM that actually learns from conversations while keeping user data private through blockchain-based anonymization. Mental health support that improves through use - without surveillance.
+
+**Innovation:** Uses Ethereum network protocols to mask user PII while still allowing the model to learn. Privacy is architectural, not just policy.
+
+**Technologies**: Custom LLM architecture, Ethereum network protocols, Python
+
+### Poly Sci Fi - Civic Technology Platform (Live)
+
+Poly Sci Fi is a civic technology platform that tracks every member of Congress in real-time. Designed to transform passive news consumers into active participants in democracy.
+
+**Current features:**
+- Real-time congressional tracking - all 535 members
+- Live updates via Congress.gov API
+- Member profiles with voting records and committee assignments
+- News tracking and coverage per representative
+
+**Technologies**: Next.js, React, TypeScript, Python, FastAPI, PostgreSQL, Google Cloud Platform
+
+### Hip-Hop Voice AI - Cultural Preservation
+
+Voice-cloned conversational AI that preserves the voice, personality, and cultural knowledge of a legendary hip-hop figure. Combines RAG with voice synthesis for interactive cultural archiving.
+
+**Architecture:**
+- Brain Node: Llama 3 with RAG for knowledge retrieval
+- Bridge Node: Middleware for personality orchestration
+- Voice Node: Coqui XTTS v2 for voice cloning
+- 100% local deployment on MacBook Pro M3
+
+**Technologies**: Llama 3 via Ollama, LanceDB, Coqui XTTS v2, OpenAI Whisper, Python, FastAPI
+
+---
+
+## Recent Federal AI Projects
 
 ### Production AI Translation API - USDA FSIS (2024)
 
@@ -25,18 +85,6 @@ Architected custom RESTful API connecting Drupal 10 to Azure AI Translation Serv
 - FISMA-compliant with federal data protection protocols
 
 **Technologies**: Python, PHP, Drupal 10, Azure AI Translation Services, Kubernetes, Redis Cluster
-
-### Hip Hop History Chatbot with Voice AI (2024-2025)
-
-Full-stack conversational AI chatbot using fine-tuned Llama model with RAG capabilities.
-
-**Key accomplishments:**
-- Complete data pipeline: 250 podcast transcriptions via Whisper
-- LLM fine-tuning via Ollama (TinyLlama, Mistral)
-- Custom voice cloning using Coqui TTS and PyTorch
-- FastAPI backend with conversational state management
-
-**Technologies**: Python, PyTorch, Ollama, Llama, Coqui TTS, Whisper, FastAPI, RAG, Redis
 
 ---
 
@@ -228,9 +276,9 @@ Built social functionality and recommendation systems for educational resource p
 
 ## Personal Projects
 
-### U.S. Congressional Directory Platform (2024)
+### Poly Sci Fi - Congressional Directory (2024)
 
-Full-stack civic technology application for legislative information.
+Full-stack civic technology application for legislative information. Poly Sci Fi tracks every member of Congress in real-time.
 
 **Key accomplishments:**
 - Next.js frontend with Python FastAPI backend on Google Cloud Platform
