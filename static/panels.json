@@ -396,27 +396,31 @@
     ]
   },
   "worldbank": {
-    "title": "World Bank Project",
+    "title": "World Bank - Open Data Platform",
     "image": "/static/images/worldbank.png",
     "content": [
       {
         "section": "Project Overview",
         "text": [
-          "Blacksky developed a research publication platform for the World Bank, enabling global access to development economics research and policy documents."
+          "Led 4-month engagement as Site Architect, integrating cloud-based solutions with Drupal to enable open data publishing. Leveraged DKAN distribution to make World Bank data accessible as open-source feeds and searchable web interface."
+        ]
+      },
+      {
+        "section": "Open Data Feeds",
+        "text": [
+          "› JSON APIs for programmatic developer access\n› GeoJSON feeds for mapping applications\n› WMS layers for GIS integration\n› CSV downloads for researcher bulk data"
         ]
       },
       {
         "section": "Key Accomplishments",
         "text": [
-          "Built multi-language content delivery system supporting publications in 7 official languages.",
-          "Implemented advanced search and filtering for 50,000+ research documents and datasets.",
-          "Designed API layer for programmatic access to World Bank research data."
+          "› Multi-cloud integration (AWS + Azure)\n› DKAN open data catalog implementation\n› DCAT-compliant metadata for discoverability\n› Faceted search with full-text capabilities\n› Automatic API endpoint generation per dataset"
         ]
       },
       {
         "section": "Technologies",
         "text": [
-          "Drupal 8, PHP, AWS, ElasticSearch, React"
+          "Drupal 7, DKAN, PHP, AWS, Azure, JSON, GeoJSON, WMS, Acquia Cloud"
         ]
       }
     ]

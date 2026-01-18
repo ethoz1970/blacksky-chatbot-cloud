@@ -248,13 +248,17 @@ Complete platform migration from legacy Adobe CMS to modern Drupal 10.
 
 ### World Bank Open Data Platform (2019)
 
-Cloud-integrated open data platform using Drupal 7 DKAN distribution.
+Led 4-month engagement as Site Architect, integrating cloud-based solutions with Drupal to enable open data publishing. Leveraged DKAN distribution to make World Bank development data accessible as open-source feeds serving researchers, developers, journalists, and GIS analysts.
 
 **Key accomplishments:**
-- AWS and Azure cloud integration
-- RESTful API for third-party data harvesting
+- Multi-cloud integration (AWS + Azure) for scalability
+- DKAN open data catalog with DCAT-compliant metadata
+- 4 feed formats: JSON APIs, GeoJSON, WMS layers, CSV downloads
+- Faceted search interface with full-text capabilities
+- Automatic API endpoint generation for each dataset
+- Data serving 189 member countries
 
-**Technologies**: Drupal 7, DKAN, PHP, AWS, Azure
+**Technologies**: Drupal 7, DKAN, PHP, AWS, Azure, JSON, GeoJSON, WMS, Acquia Cloud
 
 ---
 
