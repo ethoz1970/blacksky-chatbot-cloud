@@ -642,7 +642,10 @@ async def admin_dashboard(password: str = Query(None)):
         rows += f"""
             <tr class="lead-row" data-id="{lead['id']}" data-name="{lead['name']}" data-email="{email}" data-company="{lead.get('company') or ''}" data-status="{status}" data-score="{score}">
                 <td style="color: {score_color}; font-weight: bold;">{score}</td>
-                <td class="clickable" onclick="showConversations('{lead['id']}')">{lead['name']}</td>
+                <td>
+                    <span class="clickable" onclick="showConversations('{lead['id']}')">{lead['name']}</span>
+                    <a href="/admin/users?password={password}&highlight={lead['id']}" class="profile-link" title="View Profile">👤</a>
+                </td>
                 <td>{email_btn} {email or '-'}</td>
                 <td>{lead.get('company') or '-'}</td>
                 <td>
@@ -700,6 +703,8 @@ async def admin_dashboard(password: str = Query(None)):
                 tr.hidden {{ display: none; }}
                 .clickable {{ cursor: pointer; }}
                 .clickable:hover {{ text-decoration: underline; color: #68d; }}
+                .profile-link {{ color: #666; text-decoration: none; margin-left: 8px; font-size: 0.9rem; opacity: 0.6; transition: opacity 0.2s; }}
+                .profile-link:hover {{ opacity: 1; color: #68d; }}
                 .local-badge {{ background: #2a4a2a; color: #6f6; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px; }}
                 .action-btn {{ background: none; border: none; color: #666; cursor: pointer; padding: 4px 8px; font-family: monospace; border-radius: 4px; }}
                 .action-btn:hover {{ background: #333; color: #fff; }}
@@ -1031,7 +1036,8 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
     for ex in data['exchanges']:
         question_preview = (ex['question'][:80] + '...') if len(ex['question']) > 80 else ex['question']
         answer_preview = (ex['answer'][:80] + '...') if len(ex['answer']) > 80 else ex['answer']
-        timestamp = ex['timestamp'][:16].replace('T', ' ') if ex['timestamp'] else 'N/A'
+        timestamp_full = ex['timestamp'] if ex['timestamp'] else ''
+        timestamp_display = ex['timestamp'][:16].replace('T', ' ') if ex['timestamp'] else 'N/A'
 
         # Escape HTML in content
         question_preview = question_preview.replace('<', '&lt;').replace('>', '&gt;')
@@ -1041,10 +1047,10 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
 
         rows += f"""
             <tr class="exchange-row" onclick="toggleExpand(this)">
-                <td>{ex['user_name']}</td>
+                <td class="user-link" onclick="event.stopPropagation(); showUserProfile('{ex['user_id']}')">{ex['user_name']}</td>
                 <td>{question_preview}</td>
                 <td>{answer_preview}</td>
-                <td>{timestamp}</td>
+                <td class="timestamp" data-timestamp="{timestamp_full}">{timestamp_display}</td>
             </tr>
             <tr class="expanded-row" style="display: none;">
                 <td colspan="4">
@@ -1093,6 +1099,8 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
                 td {{ padding: 12px 15px; border-bottom: 1px solid #0f3460; }}
                 .exchange-row {{ cursor: pointer; transition: background 0.2s; }}
                 .exchange-row:hover {{ background: #1f4068; }}
+                .user-link {{ cursor: pointer; transition: color 0.2s; }}
+                .user-link:hover {{ color: #0f94d2; text-decoration: underline; }}
                 .expanded-row {{ background: #0f3460; }}
                 .expanded-content {{ padding: 15px; }}
                 .expanded-section {{ margin-bottom: 15px; }}
@@ -1137,6 +1145,8 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
             {pagination}
 
             <script>
+                const PASSWORD = '{password}';
+
                 function toggleExpand(row) {{
                     const expandedRow = row.nextElementSibling;
                     if (expandedRow && expandedRow.classList.contains('expanded-row')) {{
@@ -1145,8 +1155,39 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
                 }}
 
                 function goToPage(page) {{
-                    window.location.href = '/admin/traffic?password={password}&page=' + page;
+                    window.location.href = '/admin/traffic?password=' + PASSWORD + '&page=' + page;
                 }}
+
+                function showUserProfile(userId) {{
+                    window.location.href = '/admin/users?password=' + PASSWORD + '&highlight=' + userId;
+                }}
+
+                // Format timestamps as relative time
+                function formatRelativeTime(timestamp) {{
+                    if (!timestamp) return 'N/A';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const diffMs = now - date;
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const diffMin = Math.floor(diffSec / 60);
+                    const diffHour = Math.floor(diffMin / 60);
+                    const diffDay = Math.floor(diffHour / 24);
+
+                    if (diffSec < 60) return 'just now';
+                    if (diffMin < 60) return diffMin + ' min ago';
+                    if (diffHour < 24) return diffHour + 'h ago';
+                    if (diffDay < 7) return diffDay + 'd ago';
+                    return date.toLocaleDateString();
+                }}
+
+                // Update timestamps on load
+                document.querySelectorAll('.timestamp[data-timestamp]').forEach(el => {{
+                    const ts = el.getAttribute('data-timestamp');
+                    if (ts) {{
+                        el.textContent = formatRelativeTime(ts);
+                        el.title = ts.slice(0, 16).replace('T', ' ');
+                    }}
+                }});
             </script>
         </body>
         </html>
@@ -1169,7 +1210,8 @@ async def admin_users(
     status: str = Query(None),
     search: str = Query(None),
     sort: str = Query('last_seen'),
-    page: int = Query(1)
+    page: int = Query(1),
+    highlight: str = Query(None)
 ):
     """Admin users dashboard - view and manage all users."""
     # Show login form if no password
@@ -1286,6 +1328,8 @@ async def admin_users(
                 tr:hover {{ background: #1a1a1a; }}
                 .clickable {{ cursor: pointer; }}
                 .clickable:hover {{ text-decoration: underline; color: #68d; }}
+                .user-row.highlighted {{ background: #1a3a2a; animation: highlight-fade 3s ease-out; }}
+                @keyframes highlight-fade {{ from {{ background: #2a5a3a; }} to {{ background: #1a3a2a; }} }}
                 .auth-badge {{ display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 0.75rem; font-weight: bold; }}
                 .auth-hard {{ background: #2a4a2a; color: #6d6; }}
                 .auth-soft {{ background: #2a3a4a; color: #68d; }}
@@ -1593,6 +1637,18 @@ async def admin_users(
                 document.getElementById('searchInput').addEventListener('keypress', (e) => {{
                     if (e.key === 'Enter') applyFilters();
                 }});
+
+                // Handle highlight parameter - scroll to and highlight user
+                const highlightUserId = '{highlight or ''}';
+                if (highlightUserId) {{
+                    const userRow = document.querySelector(`tr.user-row[data-id="${{highlightUserId}}"]`);
+                    if (userRow) {{
+                        userRow.classList.add('highlighted');
+                        userRow.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                        // Also open the user detail modal
+                        showUserDetail(highlightUserId);
+                    }}
+                }}
             </script>
         </body>
         </html>
