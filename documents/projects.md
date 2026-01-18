@@ -127,14 +127,17 @@ Architected Drupal 8 to 10 migration for NIH research institute. Required federa
 
 ### USAID Environmental Database (2022-2023)
 
-Complete platform transformation from legacy PHP to enterprise Drupal 10.
+Led complete architectural transformation of USAID's Environmental Database, modernizing a legacy PHP application into enterprise-grade Drupal 10. Solo reverse-engineered the undocumented legacy system for 7 months before expanding to lead a team.
 
 **Key accomplishments:**
+- 7 months solo reverse engineering of legacy PHP with minimal documentation
 - Microservices-based integration layer reducing data latency by 75%
-- Solr search across 50,000+ records with sub-second response times
-- Led team of 3 developers, reducing production defects by 60%
+- Apache Solr search across 50,000+ records with sub-second response times
+- Led team of 2 (front-end engineer + junior dev) for final 4 months
+- 60% reduction in production defects through quality leadership
+- Delivered under budget and ahead of schedule
 
-**Technologies**: Drupal 10, PHP, Apache Solr, Acquia Cloud
+**Technologies**: Drupal 10, PHP, Apache Solr, Acquia Cloud, Microservices API integrations
 
 ### Texas Department of Health and Human Services (2022)
 

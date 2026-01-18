@@ -14,6 +14,7 @@ const ENTITY_PATTERNS = [
   { pattern: /\bSEC\b/g, key: 'sec' },
   { pattern: /\bHHS\b/g, key: 'hhs' },
   { pattern: /\bUSAID\b/g, key: 'usaid' },
+  { pattern: /\bEnvironmental Database\b/gi, key: 'usaid' },
   // Enterprise clients
   { pattern: /\bVanguard\b/gi, key: 'vanguard' },
   { pattern: /\bMastercard\b/gi, key: 'mastercard' },

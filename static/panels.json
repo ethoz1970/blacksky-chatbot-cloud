@@ -332,27 +332,31 @@
     ]
   },
   "usaid": {
-    "title": "USAID Project",
+    "title": "USAID Environmental Database",
     "image": null,
     "content": [
       {
         "section": "Project Overview",
         "text": [
-          "Blacksky architected an international development program tracking platform for USAID, supporting grant management and program reporting across global initiatives."
+          "Led the complete architectural transformation of USAID's environmental compliance database as Lead Software Architect, modernizing a legacy PHP application into an enterprise-grade Drupal 10 platform. Delivered under budget and ahead of schedule."
+        ]
+      },
+      {
+        "section": "Solo Reverse Engineering",
+        "text": [
+          "Independently reverse-engineered legacy PHP application with minimal documentation over 7 months. Analyzed existing codebase, database schema, and business logic. Built core backend infrastructure and system architecture single-handedly."
         ]
       },
       {
         "section": "Key Accomplishments",
         "text": [
-          "Designed workflow system for tracking international development grants from application through completion.",
-          "Built multi-language content delivery supporting program information in 20+ languages.",
-          "Implemented data visualization tools for program impact reporting to Congress."
+          "› 75% data latency reduction through microservices integration\n› 60% reduction in production defects through quality leadership\n› Sub-second search across 50,000+ environmental compliance records\n› Zero data loss during complete platform migration\n› On-time, under-budget delivery"
         ]
       },
       {
         "section": "Technologies",
         "text": [
-          "Drupal 8, PHP, AWS, PostgreSQL, React"
+          "Drupal 10, PHP, Apache Solr, Acquia Cloud, Microservices API integrations"
         ]
       }
     ]
