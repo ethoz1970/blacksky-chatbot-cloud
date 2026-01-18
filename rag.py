@@ -110,14 +110,17 @@ class DocumentStore:
         return len(chunks)
     
     def load_all_documents(self) -> int:
-        """Load all documents from the documents directory."""
+        """Load all documents from the documents directory (including subdirectories)."""
         total_chunks = 0
-        
-        # Support .txt and .md files
-        for ext in ['*.txt', '*.md']:
+
+        # Support .txt and .md files in all subdirectories
+        for ext in ['**/*.txt', '**/*.md']:
             for filepath in DOCS_DIR.glob(ext):
+                # Skip template files (those starting with underscore)
+                if filepath.name.startswith('_'):
+                    continue
                 total_chunks += self.add_document(filepath)
-        
+
         return total_chunks
     
     def search(self, query: str, top_k: int = TOP_K) -> List[dict]:
