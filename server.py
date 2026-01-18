@@ -34,8 +34,12 @@ from database import (
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
-# Global chatbot instance
+# Global chatbot instance (stateless - no conversation history stored)
 bot = BlackskyChatbot(use_rag=True)
+
+# Per-user session storage for conversation history
+# Key: user_id, Value: list of {"user": ..., "assistant": ...} dicts
+user_sessions: dict[str, list[dict]] = {}
 
 
 @asynccontextmanager
@@ -169,14 +173,30 @@ async def chat(request: ChatRequest):
 
     # Get user context if user_id provided
     user_context = None
+    conversation_history = []
     if request.user_id:
         get_or_create_user(request.user_id)
         user_context = get_user_context(request.user_id)
+        # Get this user's conversation history from session storage
+        conversation_history = user_sessions.get(request.user_id, [])
 
     start = time.time()
-    response = bot.chat(request.message, user_context=user_context,
-                       potential_matches=request.potential_matches)
+    response = bot.chat(
+        request.message,
+        conversation_history=conversation_history,
+        user_context=user_context,
+        potential_matches=request.potential_matches
+    )
     elapsed = (time.time() - start) * 1000
+
+    # Store the exchange in this user's session
+    if request.user_id:
+        if request.user_id not in user_sessions:
+            user_sessions[request.user_id] = []
+        user_sessions[request.user_id].append({
+            "user": request.message,
+            "assistant": response
+        })
 
     return ChatResponse(
         response=response,
@@ -197,16 +217,38 @@ async def chat_stream(request: ChatRequest):
 
     # Get user context if user_id provided
     user_context = None
+    conversation_history = []
     if request.user_id:
         get_or_create_user(request.user_id)
         user_context = get_user_context(request.user_id)
+        # Get this user's conversation history from session storage
+        conversation_history = user_sessions.get(request.user_id, [])
+
+    # We need to collect the full response for session storage
+    collected_response = []
 
     async def generate():
         try:
-            for token in bot.chat_stream(message, user_context=user_context,
-                                        potential_matches=request.potential_matches):
+            for token in bot.chat_stream(
+                message,
+                conversation_history=conversation_history,
+                user_context=user_context,
+                potential_matches=request.potential_matches
+            ):
+                collected_response.append(token)
                 yield f"data: {json.dumps({'token': token})}\n\n"
                 await asyncio.sleep(0)  # Yield to event loop for streaming
+
+            # Store the exchange in this user's session after streaming completes
+            if request.user_id:
+                full_response = "".join(collected_response)
+                if request.user_id not in user_sessions:
+                    user_sessions[request.user_id] = []
+                user_sessions[request.user_id].append({
+                    "user": message,
+                    "assistant": full_response
+                })
+
             yield "data: [DONE]\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
@@ -1194,11 +1236,17 @@ async def delete_lead(user_id: str, password: str = Query(...)):
     return {"status": "deleted"}
 
 
+class ClearRequest(BaseModel):
+    user_id: Optional[str] = None
+
+
 @app.post("/clear")
-async def clear():
-    """Clear conversation history."""
-    message = bot.clear_history()
-    return {"message": message}
+async def clear(request: ClearRequest = None):
+    """Clear conversation history for a user."""
+    if request and request.user_id and request.user_id in user_sessions:
+        user_sessions[request.user_id] = []
+        return {"message": f"Conversation history cleared for user {request.user_id}"}
+    return {"message": "No history to clear"}
 
 
 @app.get("/stats")

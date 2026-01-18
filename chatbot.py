@@ -10,11 +10,13 @@ from rag import DocumentStore
 
 
 class BlackskyChatbot:
-    """Chatbot wrapper with support for local and cloud Llama providers."""
+    """Chatbot wrapper with support for local and cloud Llama providers.
+
+    This class is stateless - conversation history must be passed per request.
+    """
 
     def __init__(self, use_rag: bool = True):
         self.llm = None
-        self.conversation_history = []
         self.use_rag = use_rag
         self.doc_store = None
 
@@ -66,16 +68,26 @@ class BlackskyChatbot:
 
         return "\n\nUSER CONTEXT:\n" + "\n".join(parts)
 
-    def _build_prompt(self, user_message: str, user_context: dict = None, potential_matches: list = None) -> str:
+    def _build_prompt(self, user_message: str, conversation_history: list = None,
+                       user_context: dict = None, potential_matches: list = None) -> str:
         """
         Build the full prompt with system message and conversation history.
         Uses Llama 3.1 instruct format with special tokens.
+
+        Args:
+            user_message: The current user message
+            conversation_history: List of {"user": ..., "assistant": ...} dicts
+            user_context: Context about the user (name, facts, etc.)
+            potential_matches: Potential returning user matches
         """
+        if conversation_history is None:
+            conversation_history = []
+
         # Get RAG context if enabled and documents exist
         rag_context = ""
         if self.use_rag and self.doc_store and self.doc_store.collection.count() > 0:
             rag_context = self.doc_store.get_context(user_message)
-        
+
         # Build system prompt with optional RAG context and user context
         system_content = SYSTEM_PROMPT
         if rag_context:
@@ -87,26 +99,36 @@ class BlackskyChatbot:
 
         # Llama 3.1 format (no begin_of_text - llama.cpp adds it automatically)
         prompt = f"<|start_header_id|>system<|end_header_id|>\n\n{system_content}<|eot_id|>"
-        
-        # Add conversation history
-        for turn in self.conversation_history[-MAX_HISTORY_TURNS:]:
+
+        # Add conversation history (last N turns)
+        for turn in conversation_history[-MAX_HISTORY_TURNS:]:
             prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{turn['user']}<|eot_id|>"
             prompt += f"<|start_header_id|>assistant<|end_header_id|>\n\n{turn['assistant']}<|eot_id|>"
-        
+
         # Add current user message
         prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{user_message}<|eot_id|>"
         prompt += f"<|start_header_id|>assistant<|end_header_id|>\n\n"
-        
+
         return prompt
     
-    def chat(self, user_message: str, user_context: dict = None, potential_matches: list = None) -> str:
+    def chat(self, user_message: str, conversation_history: list = None,
+             user_context: dict = None, potential_matches: list = None) -> str:
         """
         Generate a response to the user's message.
+
+        Args:
+            user_message: The user's message
+            conversation_history: Previous turns in this conversation
+            user_context: Context about the user
+            potential_matches: Potential returning user matches
+
+        Returns:
+            The assistant's response (caller should append to their history)
         """
         if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        prompt = self._build_prompt(user_message, user_context, potential_matches)
+        prompt = self._build_prompt(user_message, conversation_history, user_context, potential_matches)
 
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")
@@ -125,23 +147,27 @@ class BlackskyChatbot:
         print(f"[DEBUG] Response length: {len(response)} chars")
         print(f"[DEBUG] Response: {repr(response[:200])}")
 
-        # Store in history
-        self.conversation_history.append({
-            "user": user_message,
-            "assistant": response
-        })
-
         return response
     
-    def chat_stream(self, user_message: str, user_context: dict = None, potential_matches: list = None):
+    def chat_stream(self, user_message: str, conversation_history: list = None,
+                     user_context: dict = None, potential_matches: list = None):
         """
         Generate a streaming response to the user's message.
         Yields tokens as they are generated.
+
+        Args:
+            user_message: The user's message
+            conversation_history: Previous turns in this conversation
+            user_context: Context about the user
+            potential_matches: Potential returning user matches
+
+        Yields:
+            Tokens as they are generated (caller should collect and append to history)
         """
         if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        prompt = self._build_prompt(user_message, user_context, potential_matches)
+        prompt = self._build_prompt(user_message, conversation_history, user_context, potential_matches)
 
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")
@@ -159,25 +185,13 @@ class BlackskyChatbot:
             full_response += token
             yield token
 
-        # Store in history after streaming completes
-        self.conversation_history.append({
-            "user": user_message,
-            "assistant": full_response.strip()
-        })
-
         print(f"[DEBUG] Response length: {len(full_response)} chars")
-    
-    def clear_history(self):
-        """Clear conversation history."""
-        self.conversation_history = []
-        return "Conversation cleared. Fresh start!"
     
     def get_stats(self) -> dict:
         """Return current stats."""
         import os
         provider = os.getenv("LLAMA_PROVIDER", "local")
         stats = {
-            "history_turns": len(self.conversation_history),
             "max_history": MAX_HISTORY_TURNS,
             "provider": provider,
             "rag_enabled": self.use_rag
@@ -198,21 +212,25 @@ if __name__ == "__main__":
     print("Blacksky Chatbot - CLI Mode")
     print("=" * 50)
     print("Commands: /clear (reset history), /stats, /docs, /quit\n")
-    
+
     bot = BlackskyChatbot(use_rag=True)
     bot.load_model()
-    
+
+    # Local conversation history for CLI mode
+    cli_history = []
+
     while True:
         try:
             user_input = input("You: ").strip()
-            
+
             if not user_input:
                 continue
             elif user_input.lower() == "/quit":
                 print("Goodbye!")
                 break
             elif user_input.lower() == "/clear":
-                print(f"Bot: {bot.clear_history()}")
+                cli_history = []
+                print("Bot: Conversation history cleared.")
                 continue
             elif user_input.lower() == "/stats":
                 print(f"Stats: {bot.get_stats()}")
@@ -224,10 +242,12 @@ if __name__ == "__main__":
                 else:
                     print("RAG not enabled")
                 continue
-            
-            response = bot.chat(user_input)
+
+            response = bot.chat(user_input, conversation_history=cli_history)
+            # Append to local CLI history
+            cli_history.append({"user": user_input, "assistant": response})
             print(f"Bot: {response}\n")
-            
+
         except KeyboardInterrupt:
             print("\nGoodbye!")
             break

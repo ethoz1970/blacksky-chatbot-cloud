@@ -30,7 +30,7 @@ function startFollowUpTimer() {
       cursor.remove();
       followUpLine.innerHTML = '<span id="followUpText"></span><span id="typewriterCursor" style="animation: blink 1s infinite;">|</span>';
       followUpLine.style.display = 'block';
-      typeWriter('I am Maurice, the Blacksky AI. Ask me about our work.', 'followUpText', 50);
+      typeWriter('I am Maurice, the Blacksky AI. How can I help.', 'followUpText', 50);
     }
   }, 7000); // 7 seconds
 }
@@ -59,6 +59,17 @@ function showWelcomeMessage() {
 
 // Detect if user message contains a name (after Maurice asked)
 function extractNameFromMessage(text) {
+  // Words that commonly follow "I'm" or "I am" but aren't names
+  const notNames = new Set([
+    'not', 'just', 'very', 'so', 'really', 'quite', 'pretty', 'too',
+    'looking', 'interested', 'curious', 'wondering', 'trying', 'hoping',
+    'here', 'back', 'new', 'happy', 'glad', 'sorry', 'sure', 'fine',
+    'good', 'great', 'okay', 'ok', 'well', 'busy', 'free', 'available',
+    'calling', 'writing', 'reaching', 'contacting', 'asking', 'inquiring',
+    'a', 'an', 'the', 'your', 'their', 'his', 'her', 'our', 'my',
+    'working', 'using', 'building', 'developing', 'creating', 'running'
+  ]);
+
   const patterns = [
     /(?:my name is|i'm|i am|call me|this is)\s+([a-z]+(?:\s+[a-z]+){0,2})/i,
     /^([a-z]+)(?:\s+here)?[.!]?$/i
@@ -66,6 +77,11 @@ function extractNameFromMessage(text) {
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match && match[1].length >= 2 && match[1].length <= 30) {
+      const words = match[1].trim().split(/\s+/);
+      // Skip if first word is a common non-name word
+      if (notNames.has(words[0].toLowerCase())) {
+        continue;
+      }
       // Capitalize first letter of each word
       const name = match[1].trim().replace(/\b\w/g, c => c.toUpperCase());
       return name;
@@ -233,7 +249,7 @@ function addMessage(text, sender) {
   const div = document.createElement('div');
   div.className = `message ${sender}`;
 
-  const label = sender === 'bot' ? 'Blacksky' : 'You';
+  const label = sender === 'bot' ? 'Blacksky' : (currentUserName || 'You');
   const content = sender === 'bot'
     ? formatMessage(text)
     : text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
