@@ -5,9 +5,7 @@ from llm import create_llama_provider
 from config import (
     MAX_TOKENS, TEMPERATURE, TOP_P, REPEAT_PENALTY, MAX_HISTORY_TURNS, N_CTX, N_GPU_LAYERS
 )
-from prompts import SYSTEM_PROMPT
-# ADMIN MODE - commented out, can be re-enabled later
-# from prompts import ADMIN_SYSTEM_PROMPT
+from prompts import SYSTEM_PROMPT, ADMIN_SYSTEM_PROMPT
 from rag import DocumentStore
 
 
@@ -71,11 +69,8 @@ class BlackskyChatbot:
         return "\n\nUSER CONTEXT:\n" + "\n".join(parts)
 
     def _build_prompt(self, user_message: str, conversation_history: list = None,
-                       user_context: dict = None, potential_matches: list = None) -> tuple:
-        # ADMIN MODE - is_admin parameter commented out, can be re-enabled later
-        # def _build_prompt(self, user_message: str, conversation_history: list = None,
-        #                    user_context: dict = None, potential_matches: list = None,
-        #                    is_admin: bool = False) -> tuple:
+                       user_context: dict = None, potential_matches: list = None,
+                       is_admin: bool = False) -> tuple:
         """
         Build the full prompt with system message and conversation history.
         Uses Llama 3.1 instruct format with special tokens.
@@ -85,6 +80,7 @@ class BlackskyChatbot:
             conversation_history: List of {"user": ..., "assistant": ...} dicts
             user_context: Context about the user (name, facts, etc.)
             potential_matches: Potential returning user matches
+            is_admin: Whether the user is in admin mode
 
         Returns:
             Tuple of (prompt, rag_sources) where rag_sources is a list of source names
@@ -98,20 +94,19 @@ class BlackskyChatbot:
         if self.use_rag and self.doc_store and self.doc_store.collection.count() > 0:
             rag_context, rag_sources = self.doc_store.get_context_with_sources(user_message)
 
-        # ADMIN MODE - prompt switching commented out, can be re-enabled later
-        # if is_admin:
-        #     base_prompt = ADMIN_SYSTEM_PROMPT.format(base_prompt=SYSTEM_PROMPT)
-        # else:
-        #     base_prompt = SYSTEM_PROMPT
-        base_prompt = SYSTEM_PROMPT
+        # Choose base prompt based on admin status
+        if is_admin:
+            base_prompt = ADMIN_SYSTEM_PROMPT.format(base_prompt=SYSTEM_PROMPT)
+        else:
+            base_prompt = SYSTEM_PROMPT
 
         # Build system prompt with optional RAG context and user context
         system_content = base_prompt
         if rag_context:
             system_content = f"{base_prompt}\n\n{rag_context}"
-            # ADMIN MODE - RAG source info commented out, can be re-enabled later
-            # if is_admin and rag_sources:
-            #     system_content += f"\n\n[RAG SOURCES: {', '.join(rag_sources)}]"
+            # Add RAG source info for admin mode
+            if is_admin and rag_sources:
+                system_content += f"\n\n[RAG SOURCES: {', '.join(rag_sources)}]"
         # Add user context and potential matches
         context_prompt = self._build_user_context_prompt(user_context, potential_matches)
         if context_prompt:
@@ -132,11 +127,8 @@ class BlackskyChatbot:
         return prompt, rag_sources
     
     def chat(self, user_message: str, conversation_history: list = None,
-             user_context: dict = None, potential_matches: list = None) -> str:
-        # ADMIN MODE - is_admin parameter commented out, can be re-enabled later
-        # def chat(self, user_message: str, conversation_history: list = None,
-        #          user_context: dict = None, potential_matches: list = None,
-        #          is_admin: bool = False) -> str:
+             user_context: dict = None, potential_matches: list = None,
+             is_admin: bool = False) -> str:
         """
         Generate a response to the user's message.
 
@@ -145,6 +137,7 @@ class BlackskyChatbot:
             conversation_history: Previous turns in this conversation
             user_context: Context about the user
             potential_matches: Potential returning user matches
+            is_admin: Whether the user is in admin mode
 
         Returns:
             The assistant's response (caller should append to their history)
@@ -152,7 +145,7 @@ class BlackskyChatbot:
         if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches)
+        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin)
 
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")
@@ -174,11 +167,8 @@ class BlackskyChatbot:
         return response
     
     def chat_stream(self, user_message: str, conversation_history: list = None,
-                     user_context: dict = None, potential_matches: list = None):
-        # ADMIN MODE - is_admin parameter commented out, can be re-enabled later
-        # def chat_stream(self, user_message: str, conversation_history: list = None,
-        #                  user_context: dict = None, potential_matches: list = None,
-        #                  is_admin: bool = False):
+                     user_context: dict = None, potential_matches: list = None,
+                     is_admin: bool = False):
         """
         Generate a streaming response to the user's message.
         Yields tokens as they are generated.
@@ -188,6 +178,7 @@ class BlackskyChatbot:
             conversation_history: Previous turns in this conversation
             user_context: Context about the user
             potential_matches: Potential returning user matches
+            is_admin: Whether the user is in admin mode
 
         Yields:
             Tokens as they are generated (caller should collect and append to history)
@@ -195,7 +186,7 @@ class BlackskyChatbot:
         if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches)
+        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin)
 
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")

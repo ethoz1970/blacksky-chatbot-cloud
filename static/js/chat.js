@@ -428,9 +428,8 @@ async function sendMessage() {
     // Build request body
     const requestBody = {
       message: text,
-      user_id: userId
-      // ADMIN MODE - commented out, can be re-enabled later
-      // is_admin: isAdminMode
+      user_id: userId,
+      is_admin: isAdminMode
     };
 
     // Add potential matches for Maurice to verify
@@ -541,60 +540,58 @@ async function sendMessage() {
   }
 }
 
-// =============================================================================
-// ADMIN MODE - commented out, can be re-enabled later
-// =============================================================================
-// async function loginAsAdmin() {
-//   const password = prompt("Enter admin password:");
-//   if (!password) return;
-//
-//   try {
-//     const resp = await fetch(`${API_HOST}/admin/chat/login`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({ password })
-//     });
-//
-//     if (resp.ok) {
-//       isAdminMode = true;
-//       showAdminIndicator(true);
-//       addSystemMessage("Admin mode activated. You'll see enhanced information in responses.");
-//     } else {
-//       alert("Invalid password");
-//     }
-//   } catch (e) {
-//     console.error("Admin login failed:", e);
-//     alert("Admin login failed. Please try again.");
-//   }
-// }
-//
-// function logoutAdmin() {
-//   isAdminMode = false;
-//   showAdminIndicator(false);
-//   addSystemMessage("Admin mode deactivated.");
-// }
-//
-// function showAdminIndicator(show) {
-//   let indicator = document.getElementById('adminIndicator');
-//   if (!indicator) {
-//     indicator = document.createElement('div');
-//     indicator.id = 'adminIndicator';
-//     indicator.innerHTML = 'ADMIN MODE <button onclick="logoutAdmin()">Exit</button>';
-//     const header = document.querySelector('.header');
-//     if (header) {
-//       header.appendChild(indicator);
-//     }
-//   }
-//   indicator.style.display = show ? 'flex' : 'none';
-// }
-//
-// function addSystemMessage(text) {
-//   const messages = document.getElementById('messages');
-//   const div = document.createElement('div');
-//   div.className = 'message system';
-//   div.innerHTML = `
-//     <div class="message-text system-message">${text}</div>
-//   `;
-//   messages.appendChild(div);
-//   div.scrollIntoView({ behavior: 'smooth', block: 'end' });
-// }
+// Admin mode functions
+async function loginAsAdmin() {
+  const password = prompt("Enter admin password:");
+  if (!password) return;
+
+  try {
+    const resp = await fetch(`${API_HOST}/admin/chat/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+
+    if (resp.ok) {
+      isAdminMode = true;
+      showAdminIndicator(true);
+      addSystemMessage("Admin mode activated. You'll see enhanced information in responses.");
+    } else {
+      alert("Invalid password");
+    }
+  } catch (e) {
+    console.error("Admin login failed:", e);
+    alert("Admin login failed. Please try again.");
+  }
+}
+
+function logoutAdmin() {
+  isAdminMode = false;
+  showAdminIndicator(false);
+  addSystemMessage("Admin mode deactivated.");
+}
+
+function showAdminIndicator(show) {
+  let indicator = document.getElementById('adminIndicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.id = 'adminIndicator';
+    indicator.innerHTML = 'ADMIN MODE <button onclick="logoutAdmin()">Exit</button>';
+    const header = document.querySelector('.header');
+    if (header) {
+      header.appendChild(indicator);
+    }
+  }
+  indicator.style.display = show ? 'flex' : 'none';
+}
+
+function addSystemMessage(text) {
+  const messages = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message system';
+  div.innerHTML = `
+    <div class="message-text system-message">${text}</div>
+  `;
+  messages.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}

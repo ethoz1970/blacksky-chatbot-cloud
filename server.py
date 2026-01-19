@@ -106,13 +106,11 @@ class ChatRequest(BaseModel):
     user_id: Optional[str] = None
     potential_matches: Optional[List[dict]] = None
     introduce: Optional[bool] = False  # Flag to trigger Maurice introduction
-    # ADMIN MODE - commented out, can be re-enabled later
-    # is_admin: Optional[bool] = False  # Flag for admin mode with enhanced responses
+    is_admin: Optional[bool] = False  # Flag for admin mode with enhanced responses
 
 
-# ADMIN MODE - commented out, can be re-enabled later
-# class AdminLoginRequest(BaseModel):
-#     password: str
+class AdminLoginRequest(BaseModel):
+    password: str
 
 
 class ChatResponse(BaseModel):
@@ -173,13 +171,12 @@ async def db_health():
         session.close()
 
 
-# ADMIN MODE - commented out, can be re-enabled later
-# @app.post("/admin/chat/login")
-# async def admin_chat_login(request: AdminLoginRequest):
-#     """Validate admin password for chat admin mode."""
-#     if request.password == ADMIN_PASSWORD:
-#         return {"success": True, "message": "Admin mode activated"}
-#     raise HTTPException(status_code=401, detail="Invalid password")
+@app.post("/admin/chat/login")
+async def admin_chat_login(request: AdminLoginRequest):
+    """Validate admin password for chat admin mode."""
+    if request.password == ADMIN_PASSWORD:
+        return {"success": True, "message": "Admin mode activated"}
+    raise HTTPException(status_code=401, detail="Invalid password")
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -202,9 +199,8 @@ async def chat(request: ChatRequest):
         request.message,
         conversation_history=conversation_history,
         user_context=user_context,
-        potential_matches=request.potential_matches
-        # ADMIN MODE - commented out, can be re-enabled later
-        # is_admin=request.is_admin
+        potential_matches=request.potential_matches,
+        is_admin=request.is_admin
     )
     elapsed = (time.time() - start) * 1000
 
@@ -252,9 +248,8 @@ async def chat_stream(request: ChatRequest):
                 message,
                 conversation_history=conversation_history,
                 user_context=user_context,
-                potential_matches=request.potential_matches
-                # ADMIN MODE - commented out, can be re-enabled later
-                # is_admin=request.is_admin
+                potential_matches=request.potential_matches,
+                is_admin=request.is_admin
             ):
                 collected_response.append(token)
                 yield f"data: {json.dumps({'token': token})}\n\n"

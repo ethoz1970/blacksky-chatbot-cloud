@@ -33,5 +33,5 @@ let isMediumRegisterMode = true;
 let dashboardData = null;
 let isEditingProfile = false;
 
-// ADMIN MODE - commented out, can be re-enabled later
-// let isAdminMode = false;
+// Admin mode state
+let isAdminMode = false;

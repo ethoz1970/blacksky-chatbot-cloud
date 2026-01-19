@@ -26,29 +26,36 @@
   color: #e0e0e0;
 }
 
-/* =============================================================================
-   ADMIN MODE - commented out, can be re-enabled later
-   =============================================================================
+/* Admin login button - hidden by default, reveals on hover */
 .admin-login-btn {
   background: transparent;
-  border: 1px solid #333;
-  color: #555;
+  border: 1px solid transparent;
+  color: transparent;
   padding: 4px 10px;
   font-family: inherit;
   font-size: 0.65rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.15s;
+  cursor: default;
+  transition: all 0.3s ease;
   margin-left: auto;
   margin-right: 12px;
+  pointer-events: none;
+}
+
+/* Reveal button when hovering near it */
+.admin-login-btn:hover,
+.header:hover .admin-login-btn {
+  border-color: #333;
+  color: #444;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .admin-login-btn:hover {
   border-color: #666;
   color: #888;
 }
-============================================================================= */
 
 /* Responsive */
 @media (max-width: 640px) {
