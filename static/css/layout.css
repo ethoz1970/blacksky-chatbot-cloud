@@ -39,8 +39,8 @@
   cursor: default;
   margin-left: auto;
   margin-right: 22px;
-  /* Slow fade in after delay, instant fade out */
-  transition: border-color 0.8s ease 5s, color 0.8s ease 5s;
+  /* Instant fade out when not hovering */
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 /* Reveal button after hovering for 5 seconds */
@@ -48,13 +48,14 @@
   border-color: #333;
   color: #444;
   cursor: pointer;
+  /* Slow fade in with 5s delay */
+  transition: border-color 0.8s ease 5s, color 0.8s ease 5s;
 }
 
 /* Brighter on direct interaction */
 .admin-login-btn:hover:active {
   border-color: #666;
   color: #888;
-  transition-delay: 0s;
 }
 
 /* Responsive */
