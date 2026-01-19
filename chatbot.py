@@ -31,7 +31,8 @@ class BlackskyChatbot:
             self.doc_store.initialize()
         print()
 
-    def _build_user_context_prompt(self, user_context: dict, potential_matches: list = None) -> str:
+    def _build_user_context_prompt(self, user_context: dict, potential_matches: list = None,
+                                     panel_views: list = None) -> str:
         """Build a context string for returning users and potential matches."""
         parts = []
 
@@ -63,6 +64,17 @@ class BlackskyChatbot:
                 label = fact_type.replace("_", " ").title()
                 parts.append(f"  {label}: {value}")
 
+        # Add panel engagement (what pages user has viewed)
+        if panel_views and len(panel_views) > 0:
+            # Deduplicate while preserving order
+            seen = set()
+            unique_views = []
+            for v in panel_views:
+                if v not in seen:
+                    seen.add(v)
+                    unique_views.append(v)
+            parts.append(f"\nRECENT PAGE VIEWS: {', '.join(unique_views)}")
+
         if not parts:
             return ""
 
@@ -70,7 +82,7 @@ class BlackskyChatbot:
 
     def _build_prompt(self, user_message: str, conversation_history: list = None,
                        user_context: dict = None, potential_matches: list = None,
-                       is_admin: bool = False) -> tuple:
+                       is_admin: bool = False, panel_views: list = None) -> tuple:
         """
         Build the full prompt with system message and conversation history.
         Uses Llama 3.1 instruct format with special tokens.
@@ -81,6 +93,7 @@ class BlackskyChatbot:
             user_context: Context about the user (name, facts, etc.)
             potential_matches: Potential returning user matches
             is_admin: Whether the user is in admin mode
+            panel_views: List of panel titles the user has viewed
 
         Returns:
             Tuple of (prompt, rag_sources) where rag_sources is a list of source names
@@ -108,7 +121,7 @@ class BlackskyChatbot:
             if is_admin and rag_sources:
                 system_content += f"\n\n[RAG SOURCES: {', '.join(rag_sources)}]"
         # Add user context and potential matches
-        context_prompt = self._build_user_context_prompt(user_context, potential_matches)
+        context_prompt = self._build_user_context_prompt(user_context, potential_matches, panel_views)
         if context_prompt:
             system_content += context_prompt
 
@@ -168,7 +181,7 @@ class BlackskyChatbot:
     
     def chat_stream(self, user_message: str, conversation_history: list = None,
                      user_context: dict = None, potential_matches: list = None,
-                     is_admin: bool = False):
+                     is_admin: bool = False, panel_views: list = None):
         """
         Generate a streaming response to the user's message.
         Yields tokens as they are generated.
@@ -179,6 +192,7 @@ class BlackskyChatbot:
             user_context: Context about the user
             potential_matches: Potential returning user matches
             is_admin: Whether the user is in admin mode
+            panel_views: List of panel titles the user has viewed
 
         Yields:
             Tokens as they are generated (caller should collect and append to history)
@@ -186,7 +200,7 @@ class BlackskyChatbot:
         if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin)
+        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin, panel_views)
 
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")

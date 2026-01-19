@@ -429,7 +429,8 @@ async function sendMessage() {
     const requestBody = {
       message: text,
       user_id: userId,
-      is_admin: isAdminMode
+      is_admin: isAdminMode,
+      panel_views: panelViewHistory.map(v => v.title)
     };
 
     // Add potential matches for Maurice to verify

@@ -107,6 +107,7 @@ class ChatRequest(BaseModel):
     potential_matches: Optional[List[dict]] = None
     introduce: Optional[bool] = False  # Flag to trigger Maurice introduction
     is_admin: Optional[bool] = False  # Flag for admin mode with enhanced responses
+    panel_views: Optional[List[str]] = None  # Recent panels viewed by user
 
 
 class AdminLoginRequest(BaseModel):
@@ -249,7 +250,8 @@ async def chat_stream(request: ChatRequest):
                 conversation_history=conversation_history,
                 user_context=user_context,
                 potential_matches=request.potential_matches,
-                is_admin=request.is_admin
+                is_admin=request.is_admin,
+                panel_views=request.panel_views
             ):
                 collected_response.append(token)
                 yield f"data: {json.dumps({'token': token})}\n\n"

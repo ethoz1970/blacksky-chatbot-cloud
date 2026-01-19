@@ -18,6 +18,20 @@ function initUIElements() {
 
 // Slideout panel functions
 function openPanel(panelData, options = {}) {
+  // Track panel view for Maurice context
+  const lastView = panelViewHistory[panelViewHistory.length - 1];
+  if (!lastView || lastView.title !== panelData.title) {
+    panelViewHistory.push({
+      title: panelData.title,
+      key: options.panelKey || null,
+      timestamp: Date.now()
+    });
+    // Keep only last 10 views
+    if (panelViewHistory.length > 10) {
+      panelViewHistory.shift();
+    }
+  }
+
   // If opening from within a panel, save current state to history
   if (options.fromPanel && slideoutPanel.classList.contains('active')) {
     panelHistory.push({

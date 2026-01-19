@@ -164,7 +164,7 @@ function setupMenuEvents() {
       const menuPanels = getPanels();
       if (menuPanels[key]) {
         closeMenu();
-        setTimeout(() => openPanel(menuPanels[key]), 150);
+        setTimeout(() => openPanel(menuPanels[key], { panelKey: key }), 150);
       }
     });
   });
@@ -213,7 +213,7 @@ function setupImageClickEvents() {
       if (panel) {
         // Check if we're inside the slideout panel
         const isFromPanel = inlineLink.closest('.slideout-content') !== null;
-        openPanel(panel, { fromPanel: isFromPanel });
+        openPanel(panel, { fromPanel: isFromPanel, panelKey: key });
       }
     }
   });

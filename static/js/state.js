@@ -38,3 +38,6 @@ let isAdminMode = false;
 
 // Panel navigation history
 let panelHistory = [];
+
+// Panel engagement tracking (for Maurice context)
+let panelViewHistory = [];
