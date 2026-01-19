@@ -26,7 +26,7 @@
   color: #e0e0e0;
 }
 
-/* Admin login button - hidden by default, reveals on hover */
+/* Admin login button - invisible, reveals after 5s hover on its location */
 .admin-login-btn {
   background: transparent;
   border: 1px solid transparent;
@@ -37,24 +37,24 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: default;
-  transition: all 0.3s ease;
   margin-left: auto;
-  margin-right: 12px;
-  pointer-events: none;
+  margin-right: 22px;
+  /* Slow fade in after delay, instant fade out */
+  transition: border-color 0.8s ease 5s, color 0.8s ease 5s;
 }
 
-/* Reveal button when hovering near it */
-.admin-login-btn:hover,
-.header:hover .admin-login-btn {
+/* Reveal button after hovering for 5 seconds */
+.admin-login-btn:hover {
   border-color: #333;
   color: #444;
   cursor: pointer;
-  pointer-events: auto;
 }
 
-.admin-login-btn:hover {
+/* Brighter on direct interaction */
+.admin-login-btn:hover:active {
   border-color: #666;
   color: #888;
+  transition-delay: 0s;
 }
 
 /* Responsive */
