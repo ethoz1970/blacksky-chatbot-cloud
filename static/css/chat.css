@@ -216,7 +216,9 @@ textarea::placeholder {
   background: #222;
 }
 
-/* Admin mode indicator */
+/* =============================================================================
+   ADMIN MODE - commented out, can be re-enabled later
+   =============================================================================
 #adminIndicator {
   display: none;
   align-items: center;
@@ -247,7 +249,6 @@ textarea::placeholder {
   color: #1a1a1a;
 }
 
-/* System messages */
 .message.system .message-text {
   background: #1a2a1a;
   border: 1px solid #2a4a2a;
@@ -257,6 +258,7 @@ textarea::placeholder {
   font-size: 0.8rem;
   text-align: center;
 }
+============================================================================= */
 
 /* Responsive */
 @media (max-width: 640px) {
@@ -268,8 +270,10 @@ textarea::placeholder {
     padding: 12px 20px;
     padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
+  /* ADMIN MODE - commented out
   #adminIndicator {
     font-size: 0.65rem;
     padding: 3px 8px;
   }
+  */
 }
