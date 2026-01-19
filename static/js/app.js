@@ -211,7 +211,9 @@ function setupImageClickEvents() {
       const key = inlineLink.dataset.panelKey;
       const panel = getPanel(key);
       if (panel) {
-        openPanel(panel);
+        // Check if we're inside the slideout panel
+        const isFromPanel = inlineLink.closest('.slideout-content') !== null;
+        openPanel(panel, { fromPanel: isFromPanel });
       }
     }
   });

@@ -17,18 +17,51 @@ function initUIElements() {
 }
 
 // Slideout panel functions
-function openPanel(panelData) {
+function openPanel(panelData, options = {}) {
+  // If opening from within a panel, save current state to history
+  if (options.fromPanel && slideoutPanel.classList.contains('active')) {
+    panelHistory.push({
+      title: slideoutTitle.textContent,
+      content: slideoutContent.innerHTML
+    });
+    updateBackButton();
+  }
+
   slideoutTitle.textContent = panelData.title;
   slideoutContent.innerHTML = panelData.content;
   slideoutOverlay.classList.add('active');
   slideoutPanel.classList.add('active');
   document.body.style.overflow = 'hidden';
+
+  // Scroll to top of new panel
+  slideoutContent.scrollTop = 0;
+  updateBackButton();
 }
 
 function closePanel() {
   slideoutOverlay.classList.remove('active');
   slideoutPanel.classList.remove('active');
   document.body.style.overflow = '';
+  // Clear history when closing
+  panelHistory = [];
+  updateBackButton();
+}
+
+function goBackPanel() {
+  if (panelHistory.length === 0) return;
+
+  const previous = panelHistory.pop();
+  slideoutTitle.textContent = previous.title;
+  slideoutContent.innerHTML = previous.content;
+  slideoutContent.scrollTop = 0;
+  updateBackButton();
+}
+
+function updateBackButton() {
+  const backBtn = document.getElementById('slideoutBack');
+  if (backBtn) {
+    backBtn.style.display = panelHistory.length > 0 ? 'flex' : 'none';
+  }
 }
 
 // Left menu functions

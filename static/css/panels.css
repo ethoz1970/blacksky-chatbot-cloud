@@ -72,6 +72,30 @@
   color: #e0e0e0;
 }
 
+.slideout-back {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid #333;
+  color: #666;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-family: inherit;
+  transition: all 0.15s;
+  margin-right: 12px;
+}
+
+.slideout-back:hover {
+  border-color: #888;
+  color: #888;
+}
+
+.slideout-back .back-arrow {
+  font-size: 0.875rem;
+}
+
 .slideout-content {
   flex: 1;
   overflow-y: auto;
