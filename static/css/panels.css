@@ -108,17 +108,23 @@
   opacity: 0.9;
 }
 
-/* Inline links in chat messages */
+/* Inline links in chat messages and panels */
 .inline-link {
-  color: #4a9eff;
-  border-bottom: 1px dashed #4a9eff;
+  color: #888;
+  border-bottom: 1px dashed #888;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
 
 .inline-link:hover {
-  color: #7bb8ff;
-  border-color: #7bb8ff;
+  color: #e0e0e0;
+  border-color: #e0e0e0;
+}
+
+/* Ensure inline links in slideout panels are styled correctly */
+.slideout-content .inline-link {
+  color: #888;
+  border-bottom: 1px dashed #888;
 }
 
 /* Quote blocks */

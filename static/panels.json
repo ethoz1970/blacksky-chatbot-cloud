@@ -762,5 +762,52 @@
         ]
       }
     ]
+  },
+  "projects": {
+    "title": "Featured Projects",
+    "image": null,
+    "content": [
+      {
+        "section": "AI & Innovation",
+        "text": [
+          "<span class=\"inline-link\" data-panel-key=\"maurice\">Maurice AI</span> — Conversational sales agent powering this chat.",
+          "<span class=\"inline-link\" data-panel-key=\"ife\">Ife</span> — Private coding intelligence for developer productivity.",
+          "<span class=\"inline-link\" data-panel-key=\"seth\">Seth</span> — Privacy-preserving therapy LLM.",
+          "<span class=\"inline-link\" data-panel-key=\"polyscifi\">Poly Sci Fi</span> — Civic tech for democratic engagement.",
+          "<span class=\"inline-link\" data-panel-key=\"hiphopvoice\">Hip-Hop Voice AI</span> — Cultural preservation through voice synthesis."
+        ]
+      },
+      {
+        "section": "Federal Government",
+        "text": [
+          "<span class=\"inline-link\" data-panel-key=\"treasury\">U.S. Treasury</span> — Multi-site SharePoint migration for 90,000+ users.",
+          "<span class=\"inline-link\" data-panel-key=\"dot\">Dept. of Transportation</span> — Real-time permitting dashboard.",
+          "<span class=\"inline-link\" data-panel-key=\"usaid\">USAID</span> — Environmental compliance database."
+        ]
+      },
+      {
+        "section": "Enterprise & Media",
+        "text": [
+          "<span class=\"inline-link\" data-panel-key=\"worldbank\">World Bank</span> — Open data platform for global development.",
+          "<span class=\"inline-link\" data-panel-key=\"vanguard\">Vanguard</span> — Financial services platform.",
+          "<span class=\"inline-link\" data-panel-key=\"billboard\">Billboard</span> — Music industry data systems."
+        ]
+      }
+    ]
+  },
+  "latest": {
+    "title": "Latest from Blacksky",
+    "image": null,
+    "content": [
+      {
+        "section": "In-House Projects",
+        "text": [
+          "<span class=\"inline-link\" data-panel-key=\"maurice\">Maurice</span> — Our production AI sales agent, live at blackskymedia.org. Qualifies leads, answers questions about services, and captures prospect information through natural conversation. He's handling real sales conversations 24/7.",
+          "<span class=\"inline-link\" data-panel-key=\"seth\">Seth</span> — A privacy-preserving therapy LLM currently in beta. Uses blockchain-based anonymization so the model can learn from conversations without ever knowing who had them. Mental health support that improves through use, without surveillance.",
+          "<span class=\"inline-link\" data-panel-key=\"ife\">Ife</span> — Blacksky's internal coding intelligence. A private RAG-based assistant that provides Claude-level guidance while keeping proprietary code secure within our infrastructure. No code leaves the building.",
+          "<span class=\"inline-link\" data-panel-key=\"polyscifi\">Poly Sci Fi</span> — A civic technology platform tracking every member of Congress in real-time. Designed to transform passive news consumers into active participants in democracy. Not left or right, just engaged."
+        ]
+      }
+    ]
   }
 }
