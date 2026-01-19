@@ -341,7 +341,7 @@
   },
   "usaid": {
     "title": "USAID Environmental Database",
-    "image": null,
+    "image": "/static/images/usaid.jpg",
     "content": [
       {
         "section": "Project Overview",
@@ -427,7 +427,7 @@
   },
   "billboard": {
     "title": "Billboard Project",
-    "image": null,
+    "image": "/static/images/billboard.png",
     "content": [
       {
         "section": "Project Overview",
@@ -453,7 +453,7 @@
   },
   "nga": {
     "title": "National Gallery of Art Project",
-    "image": "/static/images/nga.png.webp",
+    "image": "/static/images/nga.png",
     "content": [
       {
         "section": "Project Overview",
@@ -479,7 +479,7 @@
   },
   "drupal": {
     "title": "Drupal Expertise",
-    "image": null,
+    "image": "/static/images/drupal.jpg",
     "content": [
       {
         "section": "Platform Expertise",
@@ -506,7 +506,7 @@
   },
   "kubernetes": {
     "title": "Kubernetes Expertise",
-    "image": null,
+    "image": "/static/images/kubernetes.jpeg",
     "content": [
       {
         "section": "Container Orchestration",
@@ -533,7 +533,7 @@
   },
   "azure": {
     "title": "Azure Expertise",
-    "image": null,
+    "image": "/static/images/azure.png",
     "content": [
       {
         "section": "Cloud Platform",
@@ -560,7 +560,7 @@
   },
   "aws": {
     "title": "AWS Expertise",
-    "image": null,
+    "image": "/static/images/aws.png",
     "content": [
       {
         "section": "Cloud Platform",
@@ -615,7 +615,7 @@
   },
   "maurice": {
     "title": "Maurice AI Sales Agent",
-    "image": null,
+    "image": "/static/images/maurice.png",
     "content": [
       {
         "section": "Project Overview",

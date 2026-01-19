@@ -146,18 +146,30 @@ class DocumentStore:
     
     def get_context(self, query: str, top_k: int = TOP_K) -> str:
         """Get formatted context string for injection into prompt."""
+        context, _ = self.get_context_with_sources(query, top_k)
+        return context
+
+    def get_context_with_sources(self, query: str, top_k: int = TOP_K) -> tuple:
+        """Get context and source document names for admin mode.
+
+        Returns:
+            Tuple of (context_string, source_names_list)
+        """
         chunks = self.search(query, top_k)
-        
+
         if not chunks:
-            return ""
-        
+            return "", []
+
         context_parts = ["Reference information (use naturally, do not copy formatting):"]
+        source_names = []
         for chunk in chunks:
             # Clean the chunk text of markdown formatting
             clean_text = chunk['text'].replace('---', '').replace('###', '').replace('##', '').replace('#', '').strip()
             context_parts.append(clean_text)
-        
-        return "\n\n".join(context_parts)
+            if chunk.get('source') and chunk['source'] not in source_names:
+                source_names.append(chunk['source'])
+
+        return "\n\n".join(context_parts), source_names
     
     def list_documents(self) -> List[str]:
         """List all indexed document sources."""

@@ -145,24 +145,18 @@ function addEntityLinks(text) {
   return text;
 }
 
-// Format quotes from Bruce Lee, Frank Ocean, Robert Greene with styled blocks
+// Format quotes from Bruce Lee and Frank Ocean with styled blocks
 function formatQuotes(text) {
   // Pattern: "quote text" — Source (em-dash, en-dash, or hyphen)
   text = text.replace(
-    /"([^"]+)"\s*[—–-]\s*(Bruce Lee|Frank Ocean|Robert Greene)/gi,
+    /"([^"]+)"\s*[—–-]\s*(Bruce Lee|Frank Ocean)/gi,
     '<div class="quote-block">"$1"<div class="quote-source">— $2</div></div>'
   );
 
   // Pattern: As X said, "quote" or X once said, "quote"
   text = text.replace(
-    /(?:As\s+)?(Bruce Lee|Frank Ocean|Robert Greene)\s+(?:once\s+)?said,?\s*"([^"]+)"/gi,
+    /(?:As\s+)?(Bruce Lee|Frank Ocean)\s+(?:once\s+)?said,?\s*"([^"]+)"/gi,
     '<div class="quote-block">"$2"<div class="quote-source">— $1</div></div>'
-  );
-
-  // Pattern: Law X: "quote" (48 Laws of Power)
-  text = text.replace(
-    /(Law\s+\d+):\s*"([^"]+)"/gi,
-    '<div class="quote-block">"$2"<div class="quote-source">— $1, 48 Laws of Power</div></div>'
   );
 
   return text;
@@ -432,7 +426,11 @@ async function sendMessage() {
 
   try {
     // Build request body
-    const requestBody = { message: text, user_id: userId };
+    const requestBody = {
+      message: text,
+      user_id: userId,
+      is_admin: isAdminMode
+    };
 
     // Add potential matches for Maurice to verify
     if (matchesContext) {
@@ -540,4 +538,60 @@ async function sendMessage() {
     sendBtn.disabled = false;
     input.focus();
   }
+}
+
+// Admin mode functions
+async function loginAsAdmin() {
+  const password = prompt("Enter admin password:");
+  if (!password) return;
+
+  try {
+    const resp = await fetch(`${API_HOST}/admin/chat/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+
+    if (resp.ok) {
+      isAdminMode = true;
+      showAdminIndicator(true);
+      addSystemMessage("Admin mode activated. You'll see enhanced information in responses.");
+    } else {
+      alert("Invalid password");
+    }
+  } catch (e) {
+    console.error("Admin login failed:", e);
+    alert("Admin login failed. Please try again.");
+  }
+}
+
+function logoutAdmin() {
+  isAdminMode = false;
+  showAdminIndicator(false);
+  addSystemMessage("Admin mode deactivated.");
+}
+
+function showAdminIndicator(show) {
+  let indicator = document.getElementById('adminIndicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.id = 'adminIndicator';
+    indicator.innerHTML = 'ADMIN MODE <button onclick="logoutAdmin()">Exit</button>';
+    const header = document.querySelector('.header');
+    if (header) {
+      header.appendChild(indicator);
+    }
+  }
+  indicator.style.display = show ? 'flex' : 'none';
+}
+
+function addSystemMessage(text) {
+  const messages = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message system';
+  div.innerHTML = `
+    <div class="message-text system-message">${text}</div>
+  `;
+  messages.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
 }

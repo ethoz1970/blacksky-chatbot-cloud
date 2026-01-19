@@ -216,6 +216,48 @@ textarea::placeholder {
   background: #222;
 }
 
+/* Admin mode indicator */
+#adminIndicator {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: #2a4a2a;
+  color: #6f6;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  margin-left: auto;
+  margin-right: 12px;
+}
+
+#adminIndicator button {
+  background: none;
+  border: 1px solid #6f6;
+  color: #6f6;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-family: inherit;
+}
+
+#adminIndicator button:hover {
+  background: #6f6;
+  color: #1a1a1a;
+}
+
+/* System messages */
+.message.system .message-text {
+  background: #1a2a1a;
+  border: 1px solid #2a4a2a;
+  color: #6a6;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .chat-container {
@@ -225,5 +267,9 @@ textarea::placeholder {
   .input-container {
     padding: 12px 20px;
     padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  #adminIndicator {
+    font-size: 0.65rem;
+    padding: 3px 8px;
   }
 }

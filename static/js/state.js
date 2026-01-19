@@ -32,3 +32,6 @@ let isMediumRegisterMode = true;
 // Dashboard state
 let dashboardData = null;
 let isEditingProfile = false;
+
+// Admin mode state
+let isAdminMode = false;
