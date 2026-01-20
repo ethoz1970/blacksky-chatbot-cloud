@@ -29,7 +29,14 @@ from database import (
     get_lead_details, update_lead_status, update_lead_notes, get_user_conversations,
     delete_user, get_analytics, get_user_dashboard, get_user_by_name, create_hard_user,
     verify_hard_login, get_all_exchanges, save_user_facts, get_user_facts,
-    get_all_users, get_user_full_profile
+    get_all_users, get_user_full_profile, save_page_view, get_user_page_views,
+    save_response_feedback, get_response_feedback, get_feedback_stats,
+    get_exemplary_responses, get_problematic_responses,
+    save_training_example, get_training_examples, update_training_example,
+    delete_training_example, get_training_stats, export_training_data_jsonl,
+    get_training_candidates, create_training_example_from_feedback,
+    get_funnel_analytics, get_intent_signals, get_user_journey, get_recent_high_intent_leads,
+    analyze_response_quality, get_quality_metrics, get_flagged_responses, get_hallucination_examples
 )
 
 # Paths
@@ -122,6 +129,7 @@ class ChatRequest(BaseModel):
     introduce: Optional[bool] = False  # Flag to trigger Maurice introduction
     is_admin: Optional[bool] = False  # Flag for admin mode with enhanced responses
     panel_views: Optional[List[str]] = None  # Recent panels viewed by user
+    include_debug: Optional[bool] = False  # Flag to include debug context in response
 
 
 class AdminLoginRequest(BaseModel):
@@ -153,6 +161,50 @@ class UserLookupRequest(BaseModel):
 class UserLinkRequest(BaseModel):
     current_user_id: str
     target_user_id: str
+
+
+class PageViewRequest(BaseModel):
+    user_id: str
+    view_type: str  # "panel", "link", "external"
+    title: str
+    url: Optional[str] = None
+    panel_key: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    conversation_id: int
+    message_index: int
+    rating: Optional[int] = None  # 1-5 stars
+    feedback_type: Optional[str] = None  # "accurate", "helpful", "tone", "hallucination", "off-topic", "missed-opportunity"
+    notes: Optional[str] = None
+    corrected_response: Optional[str] = None
+    is_exemplary: bool = False
+    is_problematic: bool = False
+
+
+class TrainingExampleRequest(BaseModel):
+    user_message: str
+    assistant_response: str
+    category: Optional[str] = None  # greeting, pricing, technical, objection_handling, lead_capture
+    difficulty: Optional[str] = None  # easy, medium, hard
+    relevant_facts: Optional[dict] = None
+    rag_context: Optional[str] = None
+    source_conversation_id: Optional[int] = None
+    source_feedback_id: Optional[int] = None
+    quality_score: Optional[int] = None  # 1-5
+    reviewer_notes: Optional[str] = None
+
+
+class TrainingExampleUpdateRequest(BaseModel):
+    user_message: Optional[str] = None
+    assistant_response: Optional[str] = None
+    category: Optional[str] = None
+    difficulty: Optional[str] = None
+    relevant_facts: Optional[dict] = None
+    rag_context: Optional[str] = None
+    quality_score: Optional[int] = None
+    reviewer_notes: Optional[str] = None
+    status: Optional[str] = None  # pending, approved, rejected
 
 
 @app.get("/")
@@ -200,6 +252,23 @@ async def agent_status():
             return {"status": "unreachable", "url": agent_client.base_url}
     except Exception as e:
         return {"status": "error", "reason": str(e), "url": agent_client.base_url}
+
+
+@app.post("/track/pageview")
+async def track_pageview(request: PageViewRequest):
+    """Log a page view or link click for user tracking."""
+    # Ensure user exists
+    get_or_create_user(request.user_id)
+
+    view_id = save_page_view(
+        user_id=request.user_id,
+        view_type=request.view_type,
+        title=request.title,
+        url=request.url,
+        panel_key=request.panel_key
+    )
+
+    return {"status": "tracked", "view_id": view_id}
 
 
 @app.post("/admin/chat/login")
@@ -301,15 +370,23 @@ async def chat_stream(request: ChatRequest):
                         agent_status_info["facts_count"] = len(agent_data["enhanced_facts"])
                 yield f"data: {json.dumps(agent_status_info)}\n\n"
 
-            for token in bot.chat_stream(
+            for item in bot.chat_stream(
                 message,
                 conversation_history=conversation_history,
                 user_context=user_context,
                 potential_matches=request.potential_matches,
                 is_admin=request.is_admin,
                 panel_views=request.panel_views,
-                agent_data=agent_data
+                agent_data=agent_data,
+                include_debug=request.include_debug
             ):
+                # Check if this is debug info (tuple with __DEBUG__ marker)
+                if isinstance(item, tuple) and item[0] == "__DEBUG__":
+                    debug_info = item[1]
+                    yield f"data: {json.dumps({'debug_info': debug_info})}\n\n"
+                    continue
+
+                token = item
                 collected_response.append(token)
                 yield f"data: {json.dumps({'token': token})}\n\n"
                 await asyncio.sleep(0)  # Yield to event loop for streaming
@@ -698,6 +775,9 @@ async def admin_dashboard(password: str = Query(None)):
 
     leads = get_leads(limit=100)
     analytics = get_analytics()
+    feedback_stats = get_feedback_stats()
+    funnel_data = get_funnel_analytics(days=30)
+    intent_data = get_intent_signals(days=30, min_mentions=2)[:10]  # Top 10 signals
 
     # Build HTML table rows
     rows = ""
@@ -806,6 +886,8 @@ async def admin_dashboard(password: str = Query(None)):
                     <a href="/admin?password={password}" class="btn" style="text-decoration: none; background: #1a1a1a; border-color: #68d;">Leads</a>
                     <a href="/admin/users?password={password}" class="btn" style="text-decoration: none;">Users</a>
                     <a href="/admin/traffic?password={password}" class="btn" style="text-decoration: none;">Traffic</a>
+                    <a href="/admin/quality-dashboard?password={password}" class="btn" style="text-decoration: none; color: #f88;">Quality</a>
+                    <a href="/admin/training-data?password={password}" class="btn" style="text-decoration: none; background: #2a2a1a; color: #fd0;">Training</a>
                     <button class="btn btn-primary" onclick="exportCSV()">Export CSV</button>
                 </div>
             </div>
@@ -839,6 +921,52 @@ async def admin_dashboard(password: str = Query(None)):
                 <div class="stat">
                     <div class="stat-value">{this_week}</div>
                     <div class="stat-label">This Week</div>
+                </div>
+                <div style="width: 1px; background: #333; margin: 0 10px;"></div>
+                <div class="stat">
+                    <div class="stat-value" style="color: #fd0;">{feedback_stats.get('exemplary_count', 0)}</div>
+                    <div class="stat-label">Exemplary</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" style="color: #f66;">{feedback_stats.get('problematic_count', 0)}</div>
+                    <div class="stat-label">Flagged</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{feedback_stats.get('avg_rating') or '-'}</div>
+                    <div class="stat-label">Avg Rating</div>
+                </div>
+            </div>
+
+            <!-- Lead Intelligence Panels -->
+            <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+                <!-- Funnel Panel -->
+                <div style="flex: 1; min-width: 300px; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #222;">
+                    <div style="font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px;">Lead Funnel (30 days)</div>
+                    {"".join([f'''
+                        <div style="margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px;">
+                                <span style="color: #888;">{stage["stage"]}</span>
+                                <span style="color: #e0e0e0;">{stage["count"]} <span style="color: #555;">({stage["pct"]}%)</span></span>
+                            </div>
+                            <div style="background: #222; height: 6px; border-radius: 3px; overflow: hidden;">
+                                <div style="background: {"#6d6" if stage["stage"] == "Converted" else "#68d" if stage["stage"] in ["Contacted", "High-Intent"] else "#fd0" if stage["stage"] in ["Named", "Contact Info"] else "#888"}; height: 100%; width: {min(stage["pct"], 100)}%;"></div>
+                            </div>
+                        </div>
+                    ''' for stage in funnel_data.get("funnel", [])]) if funnel_data.get("funnel") else '<div style="color: #555; text-align: center;">No funnel data</div>'}
+                </div>
+
+                <!-- Intent Signals Panel -->
+                <div style="flex: 1; min-width: 300px; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #222;">
+                    <div style="font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px;">High-Intent Triggers (30 days)</div>
+                    {"".join([f'''
+                        <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1a1a1a; font-size: 0.8rem;">
+                            <span style="color: #e0e0e0;">"{sig["keyword"]}"</span>
+                            <span>
+                                <span style="color: #888;">{sig["mentions"]} mentions</span>
+                                <span style="color: {"#6d6" if sig["intent_rate"] >= 70 else "#fd0" if sig["intent_rate"] >= 50 else "#888"}; margin-left: 8px;">{sig["intent_rate"]}% high-intent</span>
+                            </span>
+                        </div>
+                    ''' for sig in intent_data[:8]]) if intent_data else '<div style="color: #555; text-align: center;">No signals yet</div>'}
                 </div>
             </div>
 
@@ -990,16 +1118,68 @@ async def admin_dashboard(password: str = Query(None)):
                 }}
 
                 async function showConversations(userId) {{
-                    const resp = await fetch(`/admin/lead/${{userId}}?password=${{PASSWORD}}`);
-                    if (!resp.ok) {{ alert('Failed to load conversations'); return; }}
-                    const data = await resp.json();
+                    // Fetch conversations and journey in parallel
+                    const [convResp, journeyResp] = await Promise.all([
+                        fetch(`/admin/lead/${{userId}}?password=${{PASSWORD}}`),
+                        fetch(`/admin/user/${{userId}}/journey?password=${{PASSWORD}}`)
+                    ]);
 
-                    document.getElementById('convModalTitle').textContent = data.name + "'s Conversations";
+                    if (!convResp.ok) {{ alert('Failed to load conversations'); return; }}
+                    const data = await convResp.json();
+                    const journeyData = journeyResp.ok ? await journeyResp.json() : {{ journey: [] }};
+
+                    document.getElementById('convModalTitle').textContent = data.name + "'s Profile";
 
                     let html = '';
+
+                    // User Journey Timeline
+                    if (journeyData.journey && journeyData.journey.length > 0) {{
+                        html += '<div style="margin-bottom: 25px; padding: 15px; background: #0d1117; border-radius: 8px; border: 1px solid #222;">';
+                        html += '<div style="font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;">User Journey</div>';
+                        html += '<div style="position: relative; padding-left: 20px; border-left: 2px solid #333;">';
+
+                        let prevDate = '';
+                        for (const event of journeyData.journey.slice(0, 15)) {{
+                            const date = event.timestamp ? event.timestamp.slice(0, 10) : '';
+                            const time = event.timestamp ? event.timestamp.slice(11, 16) : '';
+                            const isNewDay = date !== prevDate;
+                            prevDate = date;
+
+                            const typeColors = {{
+                                'milestone': '#6d6',
+                                'intent': '#fd0',
+                                'browse': '#68d',
+                                'conversation': '#888',
+                                'status': '#f6f'
+                            }};
+                            const color = typeColors[event.type] || '#666';
+
+                            if (isNewDay && date) {{
+                                html += `<div style="font-size: 0.7rem; color: #555; margin: 10px 0 5px -20px; padding-left: 20px; border-left: 2px solid #555;">${{date}}</div>`;
+                            }}
+
+                            html += `<div style="margin-bottom: 8px; position: relative;">`;
+                            html += `<div style="position: absolute; left: -24px; top: 3px; width: 8px; height: 8px; background: ${{color}}; border-radius: 50%;"></div>`;
+                            html += `<div style="font-size: 0.8rem;">`;
+                            html += `<span style="color: ${{color}};">${{event.event}}</span>`;
+                            if (event.details) {{
+                                html += `<span style="color: #555; margin-left: 8px;">${{event.details}}</span>`;
+                            }}
+                            if (time) {{
+                                html += `<span style="color: #444; margin-left: 8px; font-size: 0.7rem;">${{time}}</span>`;
+                            }}
+                            html += `</div></div>`;
+                        }}
+
+                        html += '</div></div>';
+                    }}
+
+                    // Conversations
+                    html += '<div style="font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;">Conversations</div>';
+
                     if (data.conversations && data.conversations.length > 0) {{
                         for (const conv of data.conversations) {{
-                            html += `<div class="conversation-date">Conversation on ${{conv.created_at ? conv.created_at.slice(0,10) : 'Unknown'}}</div>`;
+                            html += `<div class="conversation-date">Conversation on ${{conv.created_at ? conv.created_at.slice(0,10) : 'Unknown'}} (Score: ${{conv.lead_score || 1}})</div>`;
                             if (conv.messages && conv.messages.length > 0) {{
                                 for (const msg of conv.messages) {{
                                     const roleClass = msg.role === 'user' ? 'message-user' : 'message-assistant';
@@ -1011,7 +1191,7 @@ async def admin_dashboard(password: str = Query(None)):
                             }}
                         }}
                     }} else {{
-                        html = '<p style="color:#666">No conversations yet</p>';
+                        html += '<p style="color:#666">No conversations yet</p>';
                     }}
 
                     document.getElementById('convModalBody').innerHTML = html;
@@ -1195,6 +1375,8 @@ async def admin_traffic(password: str = Query(None), page: int = Query(1)):
                     <a href="/admin?password={password}" style="color: #68d; text-decoration: none; padding: 8px 16px; border: 1px solid #333; border-radius: 4px;">Leads</a>
                     <a href="/admin/users?password={password}" style="color: #68d; text-decoration: none; padding: 8px 16px; border: 1px solid #333; border-radius: 4px;">Users</a>
                     <a href="/admin/traffic?password={password}" style="color: #68d; text-decoration: none; padding: 8px 16px; border: 1px solid #68d; border-radius: 4px; background: #1a1a1a;">Traffic</a>
+                    <a href="/admin/quality-dashboard?password={password}" style="color: #f88; text-decoration: none; padding: 8px 16px; border: 1px solid #333; border-radius: 4px;">Quality</a>
+                    <a href="/admin/training-data?password={password}" style="color: #fd0; text-decoration: none; padding: 8px 16px; border: 1px solid #333; border-radius: 4px;">Training</a>
                 </div>
             </div>
 
@@ -1451,6 +1633,8 @@ async def admin_users(
                     <a href="/admin?password={password}">Leads</a>
                     <a href="/admin/users?password={password}" class="active">Users</a>
                     <a href="/admin/traffic?password={password}">Traffic</a>
+                    <a href="/admin/quality-dashboard?password={password}" style="color: #f88;">Quality</a>
+                    <a href="/admin/training-data?password={password}" style="color: #fd0;">Training</a>
                 </div>
             </div>
 
@@ -1654,6 +1838,45 @@ async def admin_users(
                             }}
                         }}
 
+                        // Browsing History section
+                        if (data.browsing_history && data.browsing_history.length > 0) {{
+                            html += '<div class="section-title">Browsing Activity</div>';
+                            html += '<div style="max-height: 200px; overflow-y: auto; background: #1a1a2e; border-radius: 8px; padding: 10px;">';
+                            for (const view of data.browsing_history) {{
+                                const timestamp = view.created_at ? view.created_at.slice(0, 16).replace('T', ' ') : '?';
+                                const viewType = view.view_type || 'view';
+                                const title = view.title || 'unknown';
+                                let icon = '📄';
+                                let displayText = title;
+
+                                if (viewType === 'panel') {{
+                                    icon = '📁';
+                                    displayText = title;
+                                }} else if (viewType === 'link') {{
+                                    icon = '🔗';
+                                    displayText = title;
+                                }} else if (viewType === 'external') {{
+                                    icon = '🌐';
+                                    // Extract domain from URL
+                                    const url = view.url || title;
+                                    try {{
+                                        displayText = new URL(url).hostname;
+                                    }} catch {{
+                                        displayText = url.substring(0, 50);
+                                    }}
+                                }}
+
+                                html += `
+                                    <div style="display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid #333; font-size: 0.85rem;">
+                                        <span style="color: #666; white-space: nowrap;">${{timestamp}}</span>
+                                        <span>${{icon}}</span>
+                                        <span style="color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${{displayText}}</span>
+                                    </div>
+                                `;
+                            }}
+                            html += '</div>';
+                        }}
+
                         // Conversations section
                         if (data.conversations && data.conversations.length > 0) {{
                             html += '<div class="section-title">Conversation History</div>';
@@ -1670,19 +1893,16 @@ async def admin_users(
                                 `;
 
                                 if (conv.messages && conv.messages.length > 0) {{
-                                    for (const msg of conv.messages.slice(0, 10)) {{
+                                    for (const msg of conv.messages) {{
                                         const roleClass = msg.role === 'user' ? 'message-user' : 'message-assistant';
                                         const roleLabel = msg.role === 'user' ? 'User' : 'Maurice';
-                                        const content = msg.content.length > 300 ? msg.content.slice(0, 300) + '...' : msg.content;
+                                        const content = msg.content || '';
                                         html += `
                                             <div class="message ${{roleClass}}">
                                                 <div class="message-role">${{roleLabel}}</div>
                                                 ${{content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}}
                                             </div>
                                         `;
-                                    }}
-                                    if (conv.messages.length > 10) {{
-                                        html += `<div style="color: #666; text-align: center; padding: 10px;">... ${{conv.messages.length - 10}} more messages</div>`;
                                     }}
                                 }}
 
@@ -1739,6 +1959,9 @@ async def admin_user_detail(user_id: str, password: str = Query(...)):
     if profile is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Add browsing history
+    profile["browsing_history"] = get_user_page_views(user_id, limit=50)
+
     return profile
 
 
@@ -1779,6 +2002,945 @@ async def set_lead_notes(user_id: str, notes: str = "", password: str = Query(..
         raise HTTPException(status_code=400, detail="Failed to update notes")
 
     return {"status": "updated"}
+
+
+# ============================================
+# Response Feedback Endpoints
+# ============================================
+
+@app.post("/admin/feedback")
+async def submit_feedback(request: FeedbackRequest, password: str = Query(...)):
+    """Submit feedback on a Maurice response."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    feedback_id = save_response_feedback(
+        conversation_id=request.conversation_id,
+        message_index=request.message_index,
+        rating=request.rating,
+        feedback_type=request.feedback_type,
+        notes=request.notes,
+        corrected_response=request.corrected_response,
+        is_exemplary=request.is_exemplary,
+        is_problematic=request.is_problematic
+    )
+
+    if feedback_id is None:
+        raise HTTPException(status_code=400, detail="Failed to save feedback")
+
+    return {"status": "saved", "feedback_id": feedback_id}
+
+
+@app.get("/admin/feedback/{conversation_id}")
+async def get_conversation_feedback(conversation_id: int, password: str = Query(...)):
+    """Get all feedback for a conversation."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    feedback = get_response_feedback(conversation_id)
+    return {"feedback": feedback}
+
+
+@app.get("/admin/feedback/stats")
+async def feedback_statistics(password: str = Query(...)):
+    """Get aggregate feedback statistics."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    stats = get_feedback_stats()
+    return stats
+
+
+@app.get("/admin/feedback/exemplary")
+async def exemplary_responses(password: str = Query(...), limit: int = 100):
+    """Get exemplary responses for training data."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    responses = get_exemplary_responses(limit=limit)
+    return {"responses": responses, "count": len(responses)}
+
+
+@app.get("/admin/feedback/problematic")
+async def problematic_responses(password: str = Query(...), limit: int = 100):
+    """Get problematic responses for review."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    responses = get_problematic_responses(limit=limit)
+    return {"responses": responses, "count": len(responses)}
+
+
+@app.get("/admin/feedback/export")
+async def export_training_data(password: str = Query(...)):
+    """Export exemplary responses as JSONL for fine-tuning."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    responses = get_exemplary_responses(limit=1000)
+
+    # Format as JSONL training data
+    jsonl_lines = []
+    for r in responses:
+        if r.get("user_message") and r.get("assistant_response"):
+            # Use corrected response if available, otherwise original
+            response = r.get("corrected_response") or r.get("assistant_response")
+            training_example = {
+                "messages": [
+                    {"role": "user", "content": r["user_message"]},
+                    {"role": "assistant", "content": response}
+                ]
+            }
+            jsonl_lines.append(json.dumps(training_example))
+
+    content = "\n".join(jsonl_lines)
+
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/jsonl",
+        headers={"Content-Disposition": "attachment; filename=training_data.jsonl"}
+    )
+
+
+# ============================================
+# Training Data Management Endpoints
+# ============================================
+
+@app.post("/admin/training")
+async def create_training_example(request: TrainingExampleRequest, password: str = Query(...)):
+    """Create a new training example."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    example_id = save_training_example(
+        user_message=request.user_message,
+        assistant_response=request.assistant_response,
+        category=request.category,
+        difficulty=request.difficulty,
+        relevant_facts=request.relevant_facts,
+        rag_context=request.rag_context,
+        source_conversation_id=request.source_conversation_id,
+        source_feedback_id=request.source_feedback_id,
+        quality_score=request.quality_score,
+        reviewer_notes=request.reviewer_notes,
+        created_by="admin"
+    )
+
+    if example_id is None:
+        raise HTTPException(status_code=400, detail="Failed to create training example")
+
+    return {"status": "created", "id": example_id}
+
+
+@app.get("/admin/training")
+async def list_training_examples(
+    password: str = Query(...),
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    """List training examples with filtering."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    return get_training_examples(status=status, category=category, limit=limit, offset=offset)
+
+
+@app.get("/admin/training/stats")
+async def training_stats(password: str = Query(...)):
+    """Get training data statistics."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    return get_training_stats()
+
+
+@app.get("/admin/training/candidates")
+async def training_candidates(password: str = Query(...), limit: int = 50):
+    """Get auto-suggested training candidates."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    candidates = get_training_candidates(limit=limit)
+    return {"candidates": candidates, "count": len(candidates)}
+
+
+@app.post("/admin/training/from-feedback/{feedback_id}")
+async def create_from_feedback(feedback_id: int, password: str = Query(...)):
+    """Create a training example from an exemplary feedback entry."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    example_id = create_training_example_from_feedback(feedback_id, created_by="admin")
+
+    if example_id is None:
+        raise HTTPException(status_code=400, detail="Failed to create training example from feedback")
+
+    return {"status": "created", "id": example_id}
+
+
+@app.put("/admin/training/{example_id}")
+async def update_training(example_id: int, request: TrainingExampleUpdateRequest, password: str = Query(...)):
+    """Update a training example."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    success = update_training_example(
+        example_id=example_id,
+        user_message=request.user_message,
+        assistant_response=request.assistant_response,
+        category=request.category,
+        difficulty=request.difficulty,
+        relevant_facts=request.relevant_facts,
+        rag_context=request.rag_context,
+        quality_score=request.quality_score,
+        reviewer_notes=request.reviewer_notes,
+        status=request.status
+    )
+
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to update training example")
+
+    return {"status": "updated"}
+
+
+@app.delete("/admin/training/{example_id}")
+async def delete_training(example_id: int, password: str = Query(...)):
+    """Delete a training example."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    success = delete_training_example(example_id)
+
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to delete training example")
+
+    return {"status": "deleted"}
+
+
+@app.get("/admin/training/export")
+async def export_training(password: str = Query(...), status: str = "approved"):
+    """Export training data as JSONL file for fine-tuning."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    data = export_training_data_jsonl(status=status)
+
+    # Format as JSONL
+    jsonl_lines = [json.dumps(entry) for entry in data]
+    content = "\n".join(jsonl_lines)
+
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/jsonl",
+        headers={"Content-Disposition": f"attachment; filename=maurice_training_{status}.jsonl"}
+    )
+
+
+# ============================================
+# Lead Intelligence Endpoints
+# ============================================
+
+@app.get("/admin/analytics/funnel")
+async def funnel_analytics(password: str = Query(...), days: int = 30):
+    """Get lead funnel analytics."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    return get_funnel_analytics(days=days)
+
+
+@app.get("/admin/analytics/intent-signals")
+async def intent_signals(password: str = Query(...), days: int = 30, min_mentions: int = 3):
+    """Get intent signals analysis."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    signals = get_intent_signals(days=days, min_mentions=min_mentions)
+    return {"signals": signals, "days": days}
+
+
+@app.get("/admin/analytics/high-intent")
+async def high_intent_leads(password: str = Query(...), days: int = 7, limit: int = 10):
+    """Get recent high-intent leads."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    leads = get_recent_high_intent_leads(days=days, limit=limit)
+    return {"leads": leads, "count": len(leads)}
+
+
+@app.get("/admin/user/{user_id}/journey")
+async def user_journey(user_id: str, password: str = Query(...)):
+    """Get user journey timeline."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    journey = get_user_journey(user_id)
+    return {"journey": journey, "event_count": len(journey)}
+
+
+# ============================================
+# Response Quality Endpoints
+# ============================================
+
+@app.get("/admin/quality/metrics")
+async def quality_metrics(password: str = Query(...), days: int = 7):
+    """Get aggregated response quality metrics."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    return get_quality_metrics(days=days)
+
+
+@app.get("/admin/quality/flagged")
+async def flagged_responses(password: str = Query(...), days: int = 7, limit: int = 50):
+    """Get flagged responses for review."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    responses = get_flagged_responses(days=days, limit=limit)
+    return {"responses": responses, "count": len(responses)}
+
+
+@app.get("/admin/quality/hallucinations")
+async def hallucinations(password: str = Query(...), days: int = 30, limit: int = 20):
+    """Get hallucination examples."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    examples = get_hallucination_examples(days=days, limit=limit)
+    return {"examples": examples, "count": len(examples)}
+
+
+@app.post("/admin/quality/analyze")
+async def analyze_single_response(password: str = Query(...), user_message: str = "", assistant_response: str = ""):
+    """Analyze a single response for quality issues."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not user_message or not assistant_response:
+        raise HTTPException(status_code=400, detail="Both user_message and assistant_response required")
+
+    analysis = analyze_response_quality(user_message, assistant_response)
+    return analysis
+
+
+@app.get("/admin/quality-dashboard")
+async def admin_quality_dashboard(password: str = Query(None), days: int = Query(7)):
+    """Admin page for response quality metrics."""
+    if password != ADMIN_PASSWORD:
+        return HTMLResponse("""
+            <html>
+            <head><title>Quality Dashboard - Login</title></head>
+            <body style="font-family: monospace; background: #0a0a0a; color: #e0e0e0; padding: 40px;">
+                <h1>Quality Dashboard</h1>
+                <form method="get">
+                    <input type="password" name="password" placeholder="Password"
+                           style="padding: 8px; font-family: monospace; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333;">
+                    <button type="submit" style="padding: 8px 16px; font-family: monospace; background: #333; color: #e0e0e0; border: none; cursor: pointer;">
+                        Enter
+                    </button>
+                </form>
+            </body>
+            </html>
+        """)
+
+    # Get quality metrics
+    metrics = get_quality_metrics(days=days)
+    hallucinations = get_hallucination_examples(days=30, limit=10)
+
+    # Build flagged responses rows
+    flagged_rows = ""
+    for resp in metrics.get("flagged_responses", [])[:15]:
+        issue_tags = " ".join([
+            f'<span class="issue-tag issue-{i["severity"]}">{i["type"]}</span>'
+            for i in resp.get("issues", [])
+        ])
+        user_preview = resp.get("user_message", "")[:60]
+        asst_preview = resp.get("assistant_response", "")[:60]
+
+        flagged_rows += f"""
+            <tr>
+                <td style="color: {"#f66" if resp["quality_score"] < 50 else "#fd0" if resp["quality_score"] < 80 else "#888"};">{resp["quality_score"]}</td>
+                <td class="truncate">{user_preview}...</td>
+                <td class="truncate">{asst_preview}...</td>
+                <td>{issue_tags}</td>
+                <td style="color: #555;">{resp.get("created_at", "")[:10] if resp.get("created_at") else "-"}</td>
+            </tr>
+        """
+
+    # Build hallucination rows
+    hallucination_rows = ""
+    for h in hallucinations[:10]:
+        hallucination_rows += f"""
+            <tr>
+                <td style="color: #f66;">"{h["pattern"]}"</td>
+                <td>{h["description"]}</td>
+                <td class="truncate">{h["response_excerpt"][:80]}...</td>
+                <td style="color: #555;">{h.get("created_at", "")[:10] if h.get("created_at") else "-"}</td>
+            </tr>
+        """
+
+    # Issue breakdown
+    issue_breakdown = metrics.get("issue_breakdown", {})
+    issue_bars = ""
+    max_issues = max(issue_breakdown.values()) if issue_breakdown else 1
+    for issue_type, count in sorted(issue_breakdown.items(), key=lambda x: -x[1]):
+        width = (count / max_issues) * 100
+        color = "#f66" if issue_type == "hallucination" else "#fd0" if issue_type in ["too_short", "missed_lead_capture"] else "#888"
+        issue_bars += f"""
+            <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px;">
+                    <span style="color: #888;">{issue_type.replace("_", " ").title()}</span>
+                    <span style="color: #e0e0e0;">{count}</span>
+                </div>
+                <div style="background: #222; height: 6px; border-radius: 3px; overflow: hidden;">
+                    <div style="background: {color}; height: 100%; width: {width}%;"></div>
+                </div>
+            </div>
+        """
+
+    return HTMLResponse(f"""
+        <html>
+        <head>
+            <title>Quality Dashboard - Maurice Admin</title>
+            <style>
+                body {{ font-family: 'IBM Plex Mono', monospace; background: #0a0a0a; color: #e0e0e0; padding: 20px 40px; }}
+                h1, h2 {{ color: #888; font-weight: normal; }}
+                h2 {{ font-size: 1rem; margin-top: 30px; text-transform: uppercase; letter-spacing: 0.1em; }}
+                .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
+                .actions {{ display: flex; gap: 10px; }}
+                .btn {{ padding: 8px 16px; font-family: monospace; background: #333; color: #e0e0e0; border: none; cursor: pointer; border-radius: 4px; text-decoration: none; }}
+                .btn:hover {{ background: #444; }}
+                .stats-bar {{ display: flex; gap: 30px; padding: 20px 0; border-bottom: 1px solid #222; margin-bottom: 20px; flex-wrap: wrap; }}
+                .stat {{ text-align: center; min-width: 100px; }}
+                .stat-value {{ font-size: 2rem; font-weight: bold; }}
+                .stat-label {{ font-size: 0.7rem; color: #666; text-transform: uppercase; }}
+                .stat-good .stat-value {{ color: #6d6; }}
+                .stat-warning .stat-value {{ color: #fd0; }}
+                .stat-bad .stat-value {{ color: #f66; }}
+                .panels {{ display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }}
+                .panel {{ flex: 1; min-width: 300px; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #222; }}
+                .panel-title {{ font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px; }}
+                table {{ border-collapse: collapse; width: 100%; }}
+                th, td {{ padding: 8px 10px; text-align: left; border-bottom: 1px solid #222; font-size: 0.85rem; }}
+                th {{ color: #666; font-weight: normal; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.1em; }}
+                tr:hover {{ background: #1a1a1a; }}
+                .truncate {{ max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+                .issue-tag {{ display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; margin: 1px; }}
+                .issue-high {{ background: #3a1a1a; color: #f66; }}
+                .issue-medium {{ background: #3a3a1a; color: #fd0; }}
+                .issue-low {{ background: #1a1a1a; color: #888; }}
+                .filter-select {{ padding: 6px 12px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; font-family: monospace; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Response Quality Dashboard</h1>
+                <div class="actions">
+                    <a href="/admin?password={password}" class="btn">Leads</a>
+                    <a href="/admin/users?password={password}" class="btn">Users</a>
+                    <a href="/admin/traffic?password={password}" class="btn">Traffic</a>
+                    <a href="/admin/quality-dashboard?password={password}" class="btn" style="background: #1a1a1a; border: 1px solid #f88; color: #f88;">Quality</a>
+                    <a href="/admin/training-data?password={password}" class="btn" style="color: #fd0;">Training</a>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <select class="filter-select" onchange="window.location.href='/admin/quality-dashboard?password={password}&days=' + this.value">
+                    <option value="7" {"selected" if days == 7 else ""}>Last 7 days</option>
+                    <option value="14" {"selected" if days == 14 else ""}>Last 14 days</option>
+                    <option value="30" {"selected" if days == 30 else ""}>Last 30 days</option>
+                </select>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-bar">
+                <div class="stat {"stat-good" if metrics.get("avg_quality_score", 0) >= 80 else "stat-warning" if metrics.get("avg_quality_score", 0) >= 60 else "stat-bad"}">
+                    <div class="stat-value">{metrics.get("avg_quality_score", 0)}</div>
+                    <div class="stat-label">Avg Quality Score</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{metrics.get("total_responses", 0)}</div>
+                    <div class="stat-label">Total Responses</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{metrics.get("avg_response_words", 0)}</div>
+                    <div class="stat-label">Avg Response Words</div>
+                </div>
+                <div class="stat {"stat-good" if metrics.get("personality_rate", 0) >= 80 else "stat-warning" if metrics.get("personality_rate", 0) >= 60 else "stat-bad"}">
+                    <div class="stat-value">{metrics.get("personality_rate", 0)}%</div>
+                    <div class="stat-label">Personality Rate</div>
+                </div>
+                <div class="stat {"stat-good" if metrics.get("lead_capture_rate", 0) >= 50 else "stat-warning" if metrics.get("lead_capture_rate", 0) >= 30 else "stat-bad"}">
+                    <div class="stat-value">{metrics.get("lead_capture_rate", 0)}%</div>
+                    <div class="stat-label">Lead Capture Rate</div>
+                </div>
+                <div class="stat stat-bad">
+                    <div class="stat-value">{metrics.get("flagged_count", 0)}</div>
+                    <div class="stat-label">Flagged Responses</div>
+                </div>
+            </div>
+
+            <!-- Issue Breakdown Panel -->
+            <div class="panels">
+                <div class="panel">
+                    <div class="panel-title">Issue Breakdown ({days} days)</div>
+                    {issue_bars if issue_bars else '<div style="color: #555; text-align: center;">No issues detected</div>'}
+                </div>
+            </div>
+
+            <!-- Flagged Responses -->
+            <h2>🚨 Flagged Responses</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Score</th>
+                        <th>User Message</th>
+                        <th>Response</th>
+                        <th>Issues</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {flagged_rows if flagged_rows else '<tr><td colspan="5" style="color: #555; text-align: center;">No flagged responses</td></tr>'}
+                </tbody>
+            </table>
+
+            <!-- Hallucinations -->
+            <h2>⚠️ Hallucination Examples (30 days)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Description</th>
+                        <th>Response Excerpt</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {hallucination_rows if hallucination_rows else '<tr><td colspan="4" style="color: #6d6; text-align: center;">No hallucinations detected! 🎉</td></tr>'}
+                </tbody>
+            </table>
+        </body>
+        </html>
+    """)
+
+
+@app.get("/admin/training-data")
+async def admin_training_data(password: str = Query(None), status_filter: str = Query(None), page: int = Query(1)):
+    """Admin page for managing training data."""
+    if password != ADMIN_PASSWORD:
+        return HTMLResponse("""
+            <html>
+            <head><title>Training Data - Login</title></head>
+            <body style="font-family: monospace; background: #0a0a0a; color: #e0e0e0; padding: 40px;">
+                <h1>Training Data Dashboard</h1>
+                <form method="get">
+                    <input type="password" name="password" placeholder="Password"
+                           style="padding: 8px; font-family: monospace; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333;">
+                    <button type="submit" style="padding: 8px 16px; font-family: monospace; background: #333; color: #e0e0e0; border: none; cursor: pointer;">
+                        Enter
+                    </button>
+                </form>
+            </body>
+            </html>
+        """)
+
+    # Get stats and data
+    stats = get_training_stats()
+    offset = (page - 1) * 50
+    examples_data = get_training_examples(status=status_filter, limit=50, offset=offset)
+    candidates = get_training_candidates(limit=20)
+
+    # Build examples table rows
+    example_rows = ""
+    for ex in examples_data['examples']:
+        user_preview = (ex['user_message'][:60] + '...') if len(ex['user_message']) > 60 else ex['user_message']
+        asst_preview = (ex['assistant_response'][:60] + '...') if len(ex['assistant_response']) > 60 else ex['assistant_response']
+
+        # Escape HTML
+        user_preview = user_preview.replace('<', '&lt;').replace('>', '&gt;').replace('\n', ' ')
+        asst_preview = asst_preview.replace('<', '&lt;').replace('>', '&gt;').replace('\n', ' ')
+
+        status_color = {"pending": "#fd0", "approved": "#6d6", "rejected": "#f66"}.get(ex['status'], "#666")
+
+        example_rows += f"""
+            <tr class="example-row" data-id="{ex['id']}">
+                <td>{ex['id']}</td>
+                <td class="truncate" title="{user_preview}">{user_preview}</td>
+                <td class="truncate" title="{asst_preview}">{asst_preview}</td>
+                <td>{ex['category'] or '-'}</td>
+                <td>{ex['quality_score'] or '-'}</td>
+                <td style="color: {status_color};">{ex['status']}</td>
+                <td>
+                    <button class="action-btn" onclick="viewExample({ex['id']})" title="View/Edit">👁️</button>
+                    <button class="action-btn" onclick="approveExample({ex['id']})" title="Approve">✓</button>
+                    <button class="action-btn" onclick="rejectExample({ex['id']})" title="Reject">✗</button>
+                    <button class="action-btn delete-btn" onclick="deleteExample({ex['id']})" title="Delete">🗑️</button>
+                </td>
+            </tr>
+        """
+
+    # Build candidates rows
+    candidate_rows = ""
+    for c in candidates[:10]:
+        user_preview = (c['user_message'][:50] + '...') if c.get('user_message') and len(c['user_message']) > 50 else (c.get('user_message') or '')
+        user_preview = user_preview.replace('<', '&lt;').replace('>', '&gt;').replace('\n', ' ')
+        source = c.get('source', 'unknown')
+        priority_color = {1: '#6d6', 2: '#fd0', 3: '#68d'}.get(c.get('priority', 99), '#666')
+
+        candidate_rows += f"""
+            <tr>
+                <td style="color: {priority_color};">{source}</td>
+                <td class="truncate">{user_preview}</td>
+                <td>
+                    <button class="action-btn btn-primary" onclick="addCandidate({json.dumps(c).replace('"', '&quot;')})">+ Add</button>
+                </td>
+            </tr>
+        """
+
+    # Pagination
+    total_pages = examples_data.get('total_pages', 1)
+    prev_disabled = "disabled" if page <= 1 else ""
+    next_disabled = "disabled" if page >= total_pages else ""
+
+    return HTMLResponse(f"""
+        <html>
+        <head>
+            <title>Training Data - Maurice Admin</title>
+            <style>
+                body {{ font-family: 'IBM Plex Mono', monospace; background: #0a0a0a; color: #e0e0e0; padding: 20px 40px; }}
+                h1, h2 {{ color: #888; font-weight: normal; }}
+                h2 {{ font-size: 1rem; margin-top: 30px; text-transform: uppercase; letter-spacing: 0.1em; }}
+                .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
+                .actions {{ display: flex; gap: 10px; }}
+                .btn {{ padding: 8px 16px; font-family: monospace; background: #333; color: #e0e0e0; border: none; cursor: pointer; border-radius: 4px; text-decoration: none; }}
+                .btn:hover {{ background: #444; }}
+                .btn-primary {{ background: #2a4a2a; color: #6f6; }}
+                .btn-export {{ background: #2a2a4a; color: #68f; }}
+                .stats-bar {{ display: flex; gap: 30px; padding: 20px 0; border-bottom: 1px solid #222; margin-bottom: 20px; }}
+                .stat {{ text-align: center; }}
+                .stat-value {{ font-size: 2rem; font-weight: bold; }}
+                .stat-label {{ font-size: 0.7rem; color: #666; text-transform: uppercase; }}
+                .stat-approved .stat-value {{ color: #6d6; }}
+                .stat-pending .stat-value {{ color: #fd0; }}
+                .stat-rejected .stat-value {{ color: #f66; }}
+                .filters {{ display: flex; gap: 15px; margin-bottom: 15px; align-items: center; }}
+                .filter-input {{ padding: 8px 12px; font-family: monospace; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; border-radius: 4px; }}
+                table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+                th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #222; }}
+                th {{ color: #666; font-weight: normal; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.1em; }}
+                tr:hover {{ background: #111; }}
+                .truncate {{ max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+                .action-btn {{ background: none; border: 1px solid #333; color: #888; cursor: pointer; padding: 4px 8px; font-family: monospace; border-radius: 4px; margin: 0 2px; }}
+                .action-btn:hover {{ background: #333; color: #fff; border-color: #555; }}
+                .delete-btn:hover {{ background: #533; color: #f66; border-color: #733; }}
+                .pagination {{ display: flex; justify-content: center; align-items: center; gap: 20px; padding: 20px 0; }}
+                .pagination button {{ padding: 8px 16px; background: #333; border: none; color: #e0e0e0; cursor: pointer; border-radius: 4px; }}
+                .pagination button:disabled {{ opacity: 0.5; cursor: not-allowed; }}
+                .section {{ background: #111; padding: 20px; border-radius: 8px; margin-bottom: 20px; }}
+                .modal {{ display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; }}
+                .modal-content {{ background: #1a1a1a; margin: 5% auto; padding: 30px; width: 80%; max-width: 900px; max-height: 80vh; overflow-y: auto; border-radius: 8px; border: 1px solid #333; }}
+                .modal-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
+                .modal-close {{ font-size: 24px; cursor: pointer; color: #666; }}
+                .modal-close:hover {{ color: #fff; }}
+                .form-group {{ margin-bottom: 15px; }}
+                .form-group label {{ display: block; margin-bottom: 5px; color: #888; font-size: 0.8rem; text-transform: uppercase; }}
+                .form-group textarea, .form-group input, .form-group select {{ width: 100%; padding: 10px; background: #0a0a0a; border: 1px solid #333; color: #e0e0e0; font-family: monospace; border-radius: 4px; }}
+                .form-group textarea {{ min-height: 100px; resize: vertical; }}
+                .form-row {{ display: flex; gap: 15px; }}
+                .form-row .form-group {{ flex: 1; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Training Data Dashboard</h1>
+                <div class="actions">
+                    <a href="/admin?password={password}" class="btn">Leads</a>
+                    <a href="/admin/users?password={password}" class="btn">Users</a>
+                    <a href="/admin/traffic?password={password}" class="btn">Traffic</a>
+                    <a href="/admin/quality-dashboard?password={password}" class="btn" style="color: #f88;">Quality</a>
+                    <a href="/admin/training-data?password={password}" class="btn" style="background: #1a1a1a; border: 1px solid #fd0;">Training</a>
+                    <a href="/admin/training/export?password={password}&status=approved" class="btn btn-export">Export JSONL</a>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-bar">
+                <div class="stat">
+                    <div class="stat-value">{stats.get('total', 0)}</div>
+                    <div class="stat-label">Total Examples</div>
+                </div>
+                <div class="stat stat-approved">
+                    <div class="stat-value">{stats.get('approved', 0)}</div>
+                    <div class="stat-label">Approved</div>
+                </div>
+                <div class="stat stat-pending">
+                    <div class="stat-value">{stats.get('pending', 0)}</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat stat-rejected">
+                    <div class="stat-value">{stats.get('rejected', 0)}</div>
+                    <div class="stat-label">Rejected</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{stats.get('avg_quality_score') or '-'}</div>
+                    <div class="stat-label">Avg Quality</div>
+                </div>
+            </div>
+
+            <!-- Candidates Section -->
+            <h2>📥 Suggested Training Candidates</h2>
+            <div class="section">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>User Message Preview</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {candidate_rows if candidate_rows else '<tr><td colspan="3" style="color: #666; text-align: center;">No candidates found. Mark responses as exemplary to generate candidates.</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Training Examples Section -->
+            <h2>📚 Training Examples</h2>
+            <div class="filters">
+                <select class="filter-input" onchange="filterByStatus(this.value)">
+                    <option value="" {"selected" if not status_filter else ""}>All Status</option>
+                    <option value="pending" {"selected" if status_filter == "pending" else ""}>Pending</option>
+                    <option value="approved" {"selected" if status_filter == "approved" else ""}>Approved</option>
+                    <option value="rejected" {"selected" if status_filter == "rejected" else ""}>Rejected</option>
+                </select>
+                <button class="btn btn-primary" onclick="showCreateModal()">+ New Example</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User Message</th>
+                        <th>Assistant Response</th>
+                        <th>Category</th>
+                        <th>Quality</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {example_rows if example_rows else '<tr><td colspan="7" style="color: #666; text-align: center;">No training examples yet.</td></tr>'}
+                </tbody>
+            </table>
+
+            <div class="pagination">
+                <button onclick="goToPage({page - 1})" {prev_disabled}>&lt; Prev</button>
+                <span>Page {page} of {total_pages}</span>
+                <button onclick="goToPage({page + 1})" {next_disabled}>Next &gt;</button>
+            </div>
+
+            <!-- Edit Modal -->
+            <div id="editModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="modalTitle">Edit Training Example</h2>
+                        <span class="modal-close" onclick="closeModal()">&times;</span>
+                    </div>
+                    <form id="editForm">
+                        <input type="hidden" id="exampleId">
+                        <div class="form-group">
+                            <label>User Message</label>
+                            <textarea id="userMessage" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Assistant Response</label>
+                            <textarea id="assistantResponse" required></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select id="category">
+                                    <option value="">Select...</option>
+                                    <option value="greeting">Greeting</option>
+                                    <option value="pricing">Pricing</option>
+                                    <option value="technical">Technical</option>
+                                    <option value="objection_handling">Objection Handling</option>
+                                    <option value="lead_capture">Lead Capture</option>
+                                    <option value="company_info">Company Info</option>
+                                    <option value="project_info">Project Info</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Difficulty</label>
+                                <select id="difficulty">
+                                    <option value="">Select...</option>
+                                    <option value="easy">Easy</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Quality Score (1-5)</label>
+                                <input type="number" id="qualityScore" min="1" max="5">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Reviewer Notes</label>
+                            <textarea id="reviewerNotes"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select id="status">
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                    </form>
+                </div>
+            </div>
+
+            <script>
+                const password = '{password}';
+
+                function goToPage(p) {{
+                    const status = new URLSearchParams(window.location.search).get('status_filter') || '';
+                    window.location.href = `/admin/training-data?password=${{password}}&page=${{p}}${{status ? '&status_filter=' + status : ''}}`;
+                }}
+
+                function filterByStatus(status) {{
+                    window.location.href = `/admin/training-data?password=${{password}}${{status ? '&status_filter=' + status : ''}}`;
+                }}
+
+                function showCreateModal() {{
+                    document.getElementById('modalTitle').textContent = 'Create Training Example';
+                    document.getElementById('exampleId').value = '';
+                    document.getElementById('userMessage').value = '';
+                    document.getElementById('assistantResponse').value = '';
+                    document.getElementById('category').value = '';
+                    document.getElementById('difficulty').value = '';
+                    document.getElementById('qualityScore').value = '';
+                    document.getElementById('reviewerNotes').value = '';
+                    document.getElementById('status').value = 'pending';
+                    document.getElementById('editModal').style.display = 'block';
+                }}
+
+                async function viewExample(id) {{
+                    const resp = await fetch(`/admin/training?password=${{password}}&limit=1000`);
+                    const data = await resp.json();
+                    const ex = data.examples.find(e => e.id === id);
+                    if (!ex) return alert('Example not found');
+
+                    document.getElementById('modalTitle').textContent = 'Edit Training Example #' + id;
+                    document.getElementById('exampleId').value = id;
+                    document.getElementById('userMessage').value = ex.user_message;
+                    document.getElementById('assistantResponse').value = ex.assistant_response;
+                    document.getElementById('category').value = ex.category || '';
+                    document.getElementById('difficulty').value = ex.difficulty || '';
+                    document.getElementById('qualityScore').value = ex.quality_score || '';
+                    document.getElementById('reviewerNotes').value = ex.reviewer_notes || '';
+                    document.getElementById('status').value = ex.status || 'pending';
+                    document.getElementById('editModal').style.display = 'block';
+                }}
+
+                function closeModal() {{
+                    document.getElementById('editModal').style.display = 'none';
+                }}
+
+                async function approveExample(id) {{
+                    if (!confirm('Approve this example?')) return;
+                    const resp = await fetch(`/admin/training/${{id}}?password=${{password}}`, {{
+                        method: 'PUT',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ status: 'approved' }})
+                    }});
+                    if (resp.ok) location.reload();
+                    else alert('Failed to approve');
+                }}
+
+                async function rejectExample(id) {{
+                    if (!confirm('Reject this example?')) return;
+                    const resp = await fetch(`/admin/training/${{id}}?password=${{password}}`, {{
+                        method: 'PUT',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ status: 'rejected' }})
+                    }});
+                    if (resp.ok) location.reload();
+                    else alert('Failed to reject');
+                }}
+
+                async function deleteExample(id) {{
+                    if (!confirm('Delete this training example? This cannot be undone.')) return;
+                    const resp = await fetch(`/admin/training/${{id}}?password=${{password}}`, {{ method: 'DELETE' }});
+                    if (resp.ok) location.reload();
+                    else alert('Failed to delete');
+                }}
+
+                async function addCandidate(candidate) {{
+                    document.getElementById('modalTitle').textContent = 'Add Training Example';
+                    document.getElementById('exampleId').value = '';
+                    document.getElementById('userMessage').value = candidate.user_message || '';
+                    document.getElementById('assistantResponse').value = candidate.corrected_response || candidate.assistant_response || '';
+                    document.getElementById('category').value = '';
+                    document.getElementById('difficulty').value = '';
+                    document.getElementById('qualityScore').value = candidate.rating || '';
+                    document.getElementById('reviewerNotes').value = candidate.notes || '';
+                    document.getElementById('status').value = 'pending';
+                    document.getElementById('editModal').style.display = 'block';
+                }}
+
+                document.getElementById('editForm').addEventListener('submit', async (e) => {{
+                    e.preventDefault();
+                    const id = document.getElementById('exampleId').value;
+                    const data = {{
+                        user_message: document.getElementById('userMessage').value,
+                        assistant_response: document.getElementById('assistantResponse').value,
+                        category: document.getElementById('category').value || null,
+                        difficulty: document.getElementById('difficulty').value || null,
+                        quality_score: document.getElementById('qualityScore').value ? parseInt(document.getElementById('qualityScore').value) : null,
+                        reviewer_notes: document.getElementById('reviewerNotes').value || null,
+                        status: document.getElementById('status').value
+                    }};
+
+                    let resp;
+                    if (id) {{
+                        resp = await fetch(`/admin/training/${{id}}?password=${{password}}`, {{
+                            method: 'PUT',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify(data)
+                        }});
+                    }} else {{
+                        resp = await fetch(`/admin/training?password=${{password}}`, {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify(data)
+                        }});
+                    }}
+
+                    if (resp.ok) {{
+                        closeModal();
+                        location.reload();
+                    }} else {{
+                        alert('Failed to save');
+                    }}
+                }});
+
+                window.onclick = (e) => {{
+                    if (e.target === document.getElementById('editModal')) closeModal();
+                }};
+            </script>
+        </body>
+        </html>
+    """)
 
 
 @app.get("/admin/export")

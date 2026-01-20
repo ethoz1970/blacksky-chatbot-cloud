@@ -273,3 +273,244 @@ textarea::placeholder {
     padding: 3px 8px;
   }
 }
+
+/* Admin feedback UI */
+.admin-feedback {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.feedback-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.feedback-btn {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.feedback-btn:hover {
+  border-color: #555;
+  background: #252525;
+}
+
+.feedback-btn.active {
+  border-color: #6f6;
+  background: #1a2a1a;
+}
+
+.feedback-btn.thumbs-up.active {
+  border-color: #6f6;
+}
+
+.feedback-btn.thumbs-down.active {
+  border-color: #f66;
+  background: #2a1a1a;
+}
+
+.feedback-btn.exemplary.active {
+  border-color: #fd0;
+  background: #2a2a1a;
+}
+
+.feedback-btn.flag.active {
+  border-color: #f66;
+  background: #2a1a1a;
+}
+
+.feedback-status {
+  font-size: 0.75rem;
+  margin-left: 12px;
+  display: inline-block;
+}
+
+.feedback-notes-area {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feedback-type {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #aaa;
+  padding: 8px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.feedback-notes-input,
+.feedback-correction-input {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #e0e0e0;
+  padding: 8px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.feedback-notes-input::placeholder,
+.feedback-correction-input::placeholder {
+  color: #555;
+}
+
+.feedback-save-btn {
+  background: #2a4a2a;
+  border: 1px solid #3a6a3a;
+  color: #6f6;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  align-self: flex-start;
+  transition: all 0.15s;
+}
+
+.feedback-save-btn:hover {
+  background: #3a5a3a;
+  border-color: #4a8a4a;
+}
+
+/* Debug panel styles */
+.debug-panel {
+  margin-top: 16px;
+  padding: 12px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.debug-panel.collapsed .debug-content {
+  display: none;
+}
+
+.debug-panel.collapsed .debug-collapse-btn {
+  transform: rotate(-90deg);
+}
+
+.debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.debug-title {
+  color: #58a6ff;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.debug-collapse-btn {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  transition: transform 0.2s;
+}
+
+.debug-collapse-btn:hover {
+  color: #c9d1d9;
+}
+
+.debug-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debug-section {
+  padding: 8px;
+  background: #161b22;
+  border-radius: 4px;
+}
+
+.debug-section-title {
+  color: #8b949e;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #21262d;
+}
+
+.debug-section-title.debug-expandable {
+  cursor: pointer;
+}
+
+.debug-section-title.debug-expandable:hover {
+  color: #c9d1d9;
+}
+
+.debug-expand-hint {
+  font-size: 0.65rem;
+  color: #484f58;
+  font-style: italic;
+}
+
+.debug-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  color: #c9d1d9;
+}
+
+.debug-stat span:first-child {
+  color: #8b949e;
+}
+
+.debug-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.debug-tag {
+  background: #21262d;
+  color: #7ee787;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+
+.debug-pre {
+  background: #0d1117;
+  color: #8b949e;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.debug-pre.hidden {
+  display: none;
+}
+
+.debug-full-prompt {
+  max-height: 400px;
+}

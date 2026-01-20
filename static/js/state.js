@@ -35,6 +35,8 @@ let isEditingProfile = false;
 
 // Admin mode state
 let isAdminMode = false;
+let adminPassword = null;
+let isDebugMode = false;
 
 // Panel navigation history
 let panelHistory = [];

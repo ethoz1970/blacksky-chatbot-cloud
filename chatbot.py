@@ -32,7 +32,7 @@ class BlackskyChatbot:
         print()
 
     def _build_user_context_prompt(self, user_context: dict, potential_matches: list = None,
-                                     panel_views: list = None) -> str:
+                                     panel_views: list = None, is_admin: bool = False) -> str:
         """Build a context string for returning users and potential matches."""
         parts = []
 
@@ -64,7 +64,7 @@ class BlackskyChatbot:
                 label = fact_type.replace("_", " ").title()
                 parts.append(f"  {label}: {value}")
 
-        # Add panel engagement (what pages user has viewed)
+        # Add panel engagement (what pages user has viewed in this session)
         if panel_views and len(panel_views) > 0:
             # Deduplicate while preserving order
             seen = set()
@@ -74,6 +74,16 @@ class BlackskyChatbot:
                     seen.add(v)
                     unique_views.append(v)
             parts.append(f"\nRECENT PAGE VIEWS: {', '.join(unique_views)}")
+
+        # For admin mode, add condensed browsing summary from database
+        if is_admin and user_context and user_context.get("user_id"):
+            from database import get_user_browsing_summary
+            summary = get_user_browsing_summary(user_context["user_id"])
+
+            if summary and summary.get("top_panels"):
+                # Show top panels with view counts (e.g., "Treasury (3x), AI Services (2x)")
+                panel_items = [f"{p['title']} ({p['count']}x)" for p in summary["top_panels"]]
+                parts.append(f"\nBROWSING HISTORY: {', '.join(panel_items)}")
 
         if not parts:
             return ""
@@ -132,7 +142,7 @@ class BlackskyChatbot:
     def _build_prompt(self, user_message: str, conversation_history: list = None,
                        user_context: dict = None, potential_matches: list = None,
                        is_admin: bool = False, panel_views: list = None,
-                       agent_data: dict = None) -> tuple:
+                       agent_data: dict = None, include_debug: bool = False) -> tuple:
         """
         Build the full prompt with system message and conversation history.
         Uses Llama 3.1 instruct format with special tokens.
@@ -145,9 +155,10 @@ class BlackskyChatbot:
             is_admin: Whether the user is in admin mode
             panel_views: List of panel titles the user has viewed
             agent_data: Enriched context from agent platform
+            include_debug: Whether to return debug info
 
         Returns:
-            Tuple of (prompt, rag_sources) where rag_sources is a list of source names
+            Tuple of (prompt, rag_sources) or (prompt, rag_sources, debug_info) if include_debug
         """
         if conversation_history is None:
             conversation_history = []
@@ -172,7 +183,7 @@ class BlackskyChatbot:
             if is_admin and rag_sources:
                 system_content += f"\n\n[RAG SOURCES: {', '.join(rag_sources)}]"
         # Add user context and potential matches
-        context_prompt = self._build_user_context_prompt(user_context, potential_matches, panel_views)
+        context_prompt = self._build_user_context_prompt(user_context, potential_matches, panel_views, is_admin)
         if context_prompt:
             system_content += context_prompt
 
@@ -191,6 +202,9 @@ class BlackskyChatbot:
                     agent_info_parts.append(f"facts={len(agent_data['enhanced_facts'])}")
                 if agent_info_parts:
                     system_content += f"\n\n[AGENT DATA: {', '.join(agent_info_parts)}]"
+        elif is_admin:
+            # In admin mode, indicate when agent platform has no data
+            system_content += "\n\n[AGENT DATA: No data available for this user]"
 
         # Llama 3.1 format (no begin_of_text - llama.cpp adds it automatically)
         prompt = f"<|start_header_id|>system<|end_header_id|>\n\n{system_content}<|eot_id|>"
@@ -203,6 +217,22 @@ class BlackskyChatbot:
         # Add current user message
         prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{user_message}<|eot_id|>"
         prompt += f"<|start_header_id|>assistant<|end_header_id|>\n\n"
+
+        if include_debug:
+            # Build debug info
+            debug_info = {
+                "system_prompt_length": len(system_content),
+                "system_prompt_preview": system_content[:500] + "..." if len(system_content) > 500 else system_content,
+                "full_system_prompt": system_content,
+                "rag_context": rag_context if rag_context else None,
+                "rag_sources": rag_sources,
+                "user_context": context_prompt if context_prompt else None,
+                "agent_context": agent_context if agent_context else None,
+                "conversation_history_turns": len(conversation_history) if conversation_history else 0,
+                "total_prompt_length": len(prompt),
+                "estimated_tokens": len(prompt) // 4  # Rough estimate
+            }
+            return prompt, rag_sources, debug_info
 
         return prompt, rag_sources
     
@@ -249,7 +279,7 @@ class BlackskyChatbot:
     def chat_stream(self, user_message: str, conversation_history: list = None,
                      user_context: dict = None, potential_matches: list = None,
                      is_admin: bool = False, panel_views: list = None,
-                     agent_data: dict = None):
+                     agent_data: dict = None, include_debug: bool = False):
         """
         Generate a streaming response to the user's message.
         Yields tokens as they are generated.
@@ -262,14 +292,23 @@ class BlackskyChatbot:
             is_admin: Whether the user is in admin mode
             panel_views: List of panel titles the user has viewed
             agent_data: Enriched context from agent platform
+            include_debug: Whether to yield debug info at start
 
         Yields:
-            Tokens as they are generated (caller should collect and append to history)
+            Tokens as they are generated, or (debug_info, None) first if include_debug
         """
         if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin, panel_views, agent_data)
+        if include_debug:
+            prompt, _, debug_info = self._build_prompt(
+                user_message, conversation_history, user_context,
+                potential_matches, is_admin, panel_views, agent_data, include_debug=True
+            )
+            # Yield debug info as first item (server will handle specially)
+            yield ("__DEBUG__", debug_info)
+        else:
+            prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin, panel_views, agent_data)
 
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")

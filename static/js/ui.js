@@ -30,6 +30,18 @@ function openPanel(panelData, options = {}) {
     if (panelViewHistory.length > 10) {
       panelViewHistory.shift();
     }
+
+    // Persist to backend for long-term tracking
+    fetch(`${API_HOST}/track/pageview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        view_type: 'panel',
+        title: panelData.title,
+        panel_key: options.panelKey || null
+      })
+    }).catch(e => console.error('Failed to track panel view:', e));
   }
 
   // If opening from within a panel, save current state to history

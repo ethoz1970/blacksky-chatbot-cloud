@@ -373,6 +373,8 @@ async function sendMessage() {
   if (welcomeMsg) {
     cancelFollowUpTimer();
     welcomeMsg.remove();
+    // Add the welcome greeting to conversation history so it gets logged
+    conversationMessages.push({ role: 'assistant', content: '... hello world ... I am Maurice, the Blacksky AI. How can I help.' });
   }
 
   addMessage(text, 'user');
@@ -430,7 +432,8 @@ async function sendMessage() {
       message: text,
       user_id: userId,
       is_admin: isAdminMode,
-      panel_views: panelViewHistory.map(v => v.title)
+      panel_views: panelViewHistory.map(v => v.title),
+      include_debug: isDebugMode
     };
 
     // Add potential matches for Maurice to verify
@@ -464,6 +467,7 @@ async function sendMessage() {
     const textDiv = messageDiv.querySelector('.message-text');
     let fullResponse = '';
     let lastScrollTime = 0;
+    let debugInfo = null;
 
     // Read the stream
     const reader = res.body.getReader();
@@ -484,6 +488,11 @@ async function sendMessage() {
           }
           try {
             const parsed = JSON.parse(data);
+            // Handle debug info
+            if (parsed.debug_info) {
+              debugInfo = parsed.debug_info;
+              continue;
+            }
             if (parsed.token) {
               fullResponse += parsed.token;
               textDiv.innerHTML = formatResponse(fullResponse);
@@ -517,6 +526,23 @@ async function sendMessage() {
       conversationMessages.push({ role: 'assistant', content: fullResponse });
       // Save conversation after each response
       saveConversation();
+
+      // Add feedback UI for admin mode
+      if (isAdminMode) {
+        // Calculate message index (number of assistant messages - 1)
+        const assistantMsgCount = conversationMessages.filter(m => m.role === 'assistant').length;
+        const feedbackUI = createFeedbackUI(assistantMsgCount - 1);
+        textDiv.appendChild(feedbackUI);
+
+        // Add debug panel if debug mode is enabled
+        if (debugInfo) {
+          const debugPanel = createDebugPanel(debugInfo);
+          textDiv.appendChild(debugPanel);
+          // Turn off debug mode after showing (one-shot)
+          isDebugMode = false;
+          updateDebugToggle();
+        }
+      }
     }
 
     // Check for images after streaming completes
@@ -561,6 +587,7 @@ async function loginAsAdmin() {
 
     if (resp.ok) {
       isAdminMode = true;
+      adminPassword = password;  // Store for feedback API calls
       showAdminIndicator(true);
       addSystemMessage("Admin mode activated. You'll see enhanced information in responses.");
     } else {
@@ -574,8 +601,127 @@ async function loginAsAdmin() {
 
 function logoutAdmin() {
   isAdminMode = false;
+  adminPassword = null;
   showAdminIndicator(false);
   addSystemMessage("Admin mode deactivated.");
+}
+
+// Admin feedback on responses
+function createFeedbackUI(messageIndex) {
+  const feedbackDiv = document.createElement('div');
+  feedbackDiv.className = 'admin-feedback';
+  feedbackDiv.innerHTML = `
+    <div class="feedback-buttons">
+      <button class="feedback-btn thumbs-up" data-rating="5" title="Good response">👍</button>
+      <button class="feedback-btn thumbs-down" data-rating="1" title="Poor response">👎</button>
+      <button class="feedback-btn exemplary" data-action="exemplary" title="Mark as exemplary (training data)">⭐</button>
+      <button class="feedback-btn flag" data-action="flag" title="Flag for review">🚩</button>
+      <button class="feedback-btn notes" data-action="notes" title="Add notes">📝</button>
+    </div>
+    <div class="feedback-status"></div>
+    <div class="feedback-notes-area" style="display: none;">
+      <select class="feedback-type">
+        <option value="">Select issue type...</option>
+        <option value="accurate">Accurate</option>
+        <option value="helpful">Helpful</option>
+        <option value="tone">Tone issue</option>
+        <option value="hallucination">Hallucination</option>
+        <option value="off-topic">Off-topic</option>
+        <option value="missed-opportunity">Missed opportunity</option>
+      </select>
+      <textarea class="feedback-notes-input" placeholder="Notes about this response..."></textarea>
+      <textarea class="feedback-correction-input" placeholder="What should Maurice have said instead? (optional)"></textarea>
+      <button class="feedback-save-btn">Save Feedback</button>
+    </div>
+  `;
+
+  // Add event listeners
+  const buttons = feedbackDiv.querySelectorAll('.feedback-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const rating = btn.dataset.rating;
+      const action = btn.dataset.action;
+
+      if (action === 'notes') {
+        // Toggle notes area
+        const notesArea = feedbackDiv.querySelector('.feedback-notes-area');
+        notesArea.style.display = notesArea.style.display === 'none' ? 'block' : 'none';
+        return;
+      }
+
+      if (action === 'exemplary' || action === 'flag') {
+        await submitFeedback(messageIndex, {
+          is_exemplary: action === 'exemplary',
+          is_problematic: action === 'flag'
+        }, feedbackDiv);
+        btn.classList.add('active');
+        return;
+      }
+
+      if (rating) {
+        await submitFeedback(messageIndex, { rating: parseInt(rating) }, feedbackDiv);
+        // Highlight the clicked button
+        feedbackDiv.querySelectorAll('.thumbs-up, .thumbs-down').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    });
+  });
+
+  // Save button for detailed feedback
+  const saveBtn = feedbackDiv.querySelector('.feedback-save-btn');
+  saveBtn.addEventListener('click', async () => {
+    const feedbackType = feedbackDiv.querySelector('.feedback-type').value;
+    const notes = feedbackDiv.querySelector('.feedback-notes-input').value;
+    const correction = feedbackDiv.querySelector('.feedback-correction-input').value;
+
+    await submitFeedback(messageIndex, {
+      feedback_type: feedbackType || null,
+      notes: notes || null,
+      corrected_response: correction || null
+    }, feedbackDiv);
+
+    // Hide notes area after saving
+    feedbackDiv.querySelector('.feedback-notes-area').style.display = 'none';
+  });
+
+  return feedbackDiv;
+}
+
+async function submitFeedback(messageIndex, feedbackData, feedbackDiv) {
+  if (!currentConversationId) {
+    console.error('No conversation ID available for feedback');
+    const status = feedbackDiv.querySelector('.feedback-status');
+    status.textContent = 'Save conversation first';
+    status.style.color = '#f66';
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_HOST}/admin/feedback?password=${encodeURIComponent(adminPassword)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversation_id: currentConversationId,
+        message_index: messageIndex,
+        ...feedbackData
+      })
+    });
+
+    const status = feedbackDiv.querySelector('.feedback-status');
+    if (resp.ok) {
+      status.textContent = 'Saved';
+      status.style.color = '#6f6';
+      setTimeout(() => { status.textContent = ''; }, 2000);
+    } else {
+      status.textContent = 'Failed to save';
+      status.style.color = '#f66';
+    }
+  } catch (e) {
+    console.error('Failed to submit feedback:', e);
+    const status = feedbackDiv.querySelector('.feedback-status');
+    status.textContent = 'Error';
+    status.style.color = '#f66';
+  }
 }
 
 function showAdminIndicator(show) {
@@ -583,13 +729,32 @@ function showAdminIndicator(show) {
   if (!indicator) {
     indicator = document.createElement('div');
     indicator.id = 'adminIndicator';
-    indicator.innerHTML = 'ADMIN MODE <button onclick="logoutAdmin()">Exit</button>';
+    indicator.innerHTML = `
+      ADMIN MODE
+      <button id="debugToggle" onclick="toggleDebugMode()">🔧 Debug</button>
+      <button onclick="logoutAdmin()">Exit</button>
+    `;
     const header = document.querySelector('.header');
     if (header) {
       header.appendChild(indicator);
     }
   }
   indicator.style.display = show ? 'flex' : 'none';
+  updateDebugToggle();
+}
+
+function toggleDebugMode() {
+  isDebugMode = !isDebugMode;
+  updateDebugToggle();
+  addSystemMessage(isDebugMode ? "Debug mode ON - next response will show full prompt context" : "Debug mode OFF");
+}
+
+function updateDebugToggle() {
+  const toggle = document.getElementById('debugToggle');
+  if (toggle) {
+    toggle.style.background = isDebugMode ? '#4a4' : '';
+    toggle.style.color = isDebugMode ? '#000' : '';
+  }
 }
 
 function addSystemMessage(text) {
@@ -601,4 +766,89 @@ function addSystemMessage(text) {
   `;
   messages.appendChild(div);
   div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+// Create debug panel for admin mode
+function createDebugPanel(debugInfo) {
+  const panel = document.createElement('div');
+  panel.className = 'debug-panel';
+
+  const header = document.createElement('div');
+  header.className = 'debug-header';
+  header.innerHTML = `
+    <span class="debug-title">🔧 Prompt Debug Info</span>
+    <button class="debug-collapse-btn" onclick="this.parentElement.parentElement.classList.toggle('collapsed')">▼</button>
+  `;
+  panel.appendChild(header);
+
+  const content = document.createElement('div');
+  content.className = 'debug-content';
+
+  // Stats section
+  const stats = document.createElement('div');
+  stats.className = 'debug-section';
+  stats.innerHTML = `
+    <div class="debug-section-title">Statistics</div>
+    <div class="debug-stat"><span>System prompt:</span> ${debugInfo.system_prompt_length?.toLocaleString() || 0} chars</div>
+    <div class="debug-stat"><span>Total prompt:</span> ${debugInfo.total_prompt_length?.toLocaleString() || 0} chars</div>
+    <div class="debug-stat"><span>Est. tokens:</span> ~${debugInfo.estimated_tokens?.toLocaleString() || 0}</div>
+    <div class="debug-stat"><span>History turns:</span> ${debugInfo.conversation_history_turns || 0}</div>
+  `;
+  content.appendChild(stats);
+
+  // RAG Sources
+  if (debugInfo.rag_sources && debugInfo.rag_sources.length > 0) {
+    const ragSection = document.createElement('div');
+    ragSection.className = 'debug-section';
+    ragSection.innerHTML = `
+      <div class="debug-section-title">RAG Sources (${debugInfo.rag_sources.length})</div>
+      <div class="debug-list">${debugInfo.rag_sources.map(s => `<span class="debug-tag">${s}</span>`).join('')}</div>
+    `;
+    content.appendChild(ragSection);
+  }
+
+  // User Context
+  if (debugInfo.user_context) {
+    const userSection = document.createElement('div');
+    userSection.className = 'debug-section';
+    userSection.innerHTML = `
+      <div class="debug-section-title">User Context</div>
+      <pre class="debug-pre">${escapeHtml(debugInfo.user_context)}</pre>
+    `;
+    content.appendChild(userSection);
+  }
+
+  // Agent Context
+  if (debugInfo.agent_context) {
+    const agentSection = document.createElement('div');
+    agentSection.className = 'debug-section';
+    agentSection.innerHTML = `
+      <div class="debug-section-title">Agent Platform Context</div>
+      <pre class="debug-pre">${escapeHtml(debugInfo.agent_context)}</pre>
+    `;
+    content.appendChild(agentSection);
+  }
+
+  // Full System Prompt (collapsible)
+  if (debugInfo.full_system_prompt) {
+    const promptSection = document.createElement('div');
+    promptSection.className = 'debug-section';
+    promptSection.innerHTML = `
+      <div class="debug-section-title debug-expandable" onclick="this.nextElementSibling.classList.toggle('hidden')">
+        Full System Prompt <span class="debug-expand-hint">(click to expand)</span>
+      </div>
+      <pre class="debug-pre debug-full-prompt hidden">${escapeHtml(debugInfo.full_system_prompt)}</pre>
+    `;
+    content.appendChild(promptSection);
+  }
+
+  panel.appendChild(content);
+  return panel;
+}
+
+// Escape HTML for safe display
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }

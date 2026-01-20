@@ -14,6 +14,7 @@ function initApp() {
   setupKeyboardEvents();
   setupImageClickEvents();
   setupConversationSaving();
+  setupLinkTracking();
 
   // Start welcome typewriter effect
   typeWriter('... hello world ...', 'typewriterText', 80, startFollowUpTimer);
@@ -216,6 +217,33 @@ function setupImageClickEvents() {
         openPanel(panel, { fromPanel: isFromPanel, panelKey: key });
       }
     }
+  });
+}
+
+// Link click tracking for user engagement analytics
+function setupLinkTracking() {
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (!link || !link.href) return;
+
+    // Skip internal navigation and javascript links
+    if (link.href.startsWith('javascript:') || link.href === '#') return;
+
+    const isExternal = link.hostname !== window.location.hostname;
+    const viewType = isExternal ? 'external' : 'link';
+    const title = link.textContent?.trim() || link.href;
+
+    // Track the click
+    fetch(`${API_HOST}/track/pageview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        view_type: viewType,
+        title: title.substring(0, 200),  // Limit title length
+        url: link.href
+      })
+    }).catch(e => console.error('Failed to track link click:', e));
   });
 }
 
