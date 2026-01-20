@@ -80,9 +80,59 @@ class BlackskyChatbot:
 
         return "\n\nUSER CONTEXT:\n" + "\n".join(parts)
 
+    def _build_agent_context_prompt(self, agent_data: dict) -> str:
+        """Build a context string from agent platform intelligence."""
+        if not agent_data or not agent_data.get("success"):
+            return ""
+
+        parts = []
+
+        # Interest level from agent analysis
+        if agent_data.get("interest_level"):
+            level = agent_data["interest_level"]
+            level_descriptions = {
+                "hot": "HIGH INTEREST - This user has shown strong buying signals",
+                "warm": "MODERATE INTEREST - This user is engaged and exploring",
+                "cold": "LOW INTEREST - This user is just browsing"
+            }
+            desc = level_descriptions.get(level, f"Interest level: {level}")
+            parts.append(f"LEAD TEMPERATURE: {desc}")
+
+        # Lead status
+        if agent_data.get("lead_status"):
+            parts.append(f"Lead Status: {agent_data['lead_status']}")
+
+        # Enhanced facts from AI extraction
+        if agent_data.get("enhanced_facts"):
+            parts.append("\nAI-EXTRACTED INTELLIGENCE:")
+            for fact_key, fact_value in agent_data["enhanced_facts"].items():
+                label = fact_key.replace("_", " ").title()
+                parts.append(f"  {label}: {fact_value}")
+
+        # Conversation summary from agent platform
+        if agent_data.get("conversation_summary"):
+            parts.append(f"\nAGENT CONVERSATION SUMMARY: {agent_data['conversation_summary']}")
+
+        # Company research if available
+        if agent_data.get("company_research"):
+            research = agent_data["company_research"]
+            parts.append("\nCOMPANY INTELLIGENCE:")
+            if research.get("company_name"):
+                parts.append(f"  Company: {research['company_name']}")
+            if research.get("industry"):
+                parts.append(f"  Industry: {research['industry']}")
+            if research.get("summary"):
+                parts.append(f"  Overview: {research['summary']}")
+
+        if not parts:
+            return ""
+
+        return "\n\nAGENT PLATFORM INTELLIGENCE:\n" + "\n".join(parts)
+
     def _build_prompt(self, user_message: str, conversation_history: list = None,
                        user_context: dict = None, potential_matches: list = None,
-                       is_admin: bool = False, panel_views: list = None) -> tuple:
+                       is_admin: bool = False, panel_views: list = None,
+                       agent_data: dict = None) -> tuple:
         """
         Build the full prompt with system message and conversation history.
         Uses Llama 3.1 instruct format with special tokens.
@@ -94,6 +144,7 @@ class BlackskyChatbot:
             potential_matches: Potential returning user matches
             is_admin: Whether the user is in admin mode
             panel_views: List of panel titles the user has viewed
+            agent_data: Enriched context from agent platform
 
         Returns:
             Tuple of (prompt, rag_sources) where rag_sources is a list of source names
@@ -124,6 +175,22 @@ class BlackskyChatbot:
         context_prompt = self._build_user_context_prompt(user_context, potential_matches, panel_views)
         if context_prompt:
             system_content += context_prompt
+
+        # Add agent platform intelligence
+        agent_context = self._build_agent_context_prompt(agent_data)
+        if agent_context:
+            system_content += agent_context
+            # Add agent data indicator for admin mode
+            if is_admin and agent_data and agent_data.get("success"):
+                agent_info_parts = []
+                if agent_data.get("interest_level"):
+                    agent_info_parts.append(f"interest={agent_data['interest_level']}")
+                if agent_data.get("lead_status"):
+                    agent_info_parts.append(f"status={agent_data['lead_status']}")
+                if agent_data.get("enhanced_facts"):
+                    agent_info_parts.append(f"facts={len(agent_data['enhanced_facts'])}")
+                if agent_info_parts:
+                    system_content += f"\n\n[AGENT DATA: {', '.join(agent_info_parts)}]"
 
         # Llama 3.1 format (no begin_of_text - llama.cpp adds it automatically)
         prompt = f"<|start_header_id|>system<|end_header_id|>\n\n{system_content}<|eot_id|>"
@@ -181,7 +248,8 @@ class BlackskyChatbot:
     
     def chat_stream(self, user_message: str, conversation_history: list = None,
                      user_context: dict = None, potential_matches: list = None,
-                     is_admin: bool = False, panel_views: list = None):
+                     is_admin: bool = False, panel_views: list = None,
+                     agent_data: dict = None):
         """
         Generate a streaming response to the user's message.
         Yields tokens as they are generated.
@@ -193,6 +261,7 @@ class BlackskyChatbot:
             potential_matches: Potential returning user matches
             is_admin: Whether the user is in admin mode
             panel_views: List of panel titles the user has viewed
+            agent_data: Enriched context from agent platform
 
         Yields:
             Tokens as they are generated (caller should collect and append to history)
@@ -200,7 +269,7 @@ class BlackskyChatbot:
         if self.llm is None or not self.llm.is_loaded():
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
-        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin, panel_views)
+        prompt, _ = self._build_prompt(user_message, conversation_history, user_context, potential_matches, is_admin, panel_views, agent_data)
 
         # Debug: log prompt size
         print(f"[DEBUG] Prompt length: {len(prompt)} chars, ~{len(prompt) // 4} tokens")

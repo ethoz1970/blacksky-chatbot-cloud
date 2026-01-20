@@ -66,3 +66,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "localdev")
 
 # JWT secret for token signing
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-prod")
+
+# Agent Platform settings (optional - enriches user context via external agents)
+AGENT_PLATFORM_URL = os.getenv("AGENT_PLATFORM_URL", "")
+AGENT_PLATFORM_TIMEOUT = float(os.getenv("AGENT_PLATFORM_TIMEOUT", "30.0"))

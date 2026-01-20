@@ -167,6 +167,16 @@
   margin-top: 4px;
 }
 
+/* LLM disclaimer */
+.llm-disclaimer {
+  color: #666;
+  font-size: 0.75em;
+  font-style: italic;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #3a3a3a;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .slideout-panel {

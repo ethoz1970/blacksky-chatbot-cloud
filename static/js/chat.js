@@ -506,6 +506,12 @@ async function sendMessage() {
     // Final scroll after streaming completes
     messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
+    // Add disclaimer after response
+    const disclaimer = document.createElement('div');
+    disclaimer.className = 'llm-disclaimer';
+    disclaimer.textContent = 'Maurice is an AI assistant and may make mistakes.';
+    textDiv.appendChild(disclaimer);
+
     // Track bot response
     if (fullResponse) {
       conversationMessages.push({ role: 'assistant', content: fullResponse });

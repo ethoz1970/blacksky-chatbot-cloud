@@ -21,6 +21,7 @@ import jwt
 
 from chatbot import BlackskyChatbot
 from config import HOST, PORT, ADMIN_PASSWORD, JWT_SECRET_KEY, CORS_ORIGINS
+from agents import agent_client
 from rag import DocumentStore, DOCS_DIR
 from database import (
     init_db, get_or_create_user, update_user, save_conversation, update_conversation,
@@ -57,8 +58,21 @@ async def lifespan(app: FastAPI):
         print("Loading documents...")
         bot.doc_store.load_all_documents()
 
+    # Check agent platform connectivity
+    if agent_client.is_configured:
+        agent_healthy = await agent_client.health_check()
+        if agent_healthy:
+            print(f"[AGENTS] Connected to agent platform at {agent_client.base_url}")
+        else:
+            print(f"[AGENTS] Warning: Agent platform at {agent_client.base_url} not reachable")
+    else:
+        print("[AGENTS] Agent platform not configured (AGENT_PLATFORM_URL not set)")
+
     yield
+
+    # Cleanup
     print("Shutting down...")
+    await agent_client.close()
 
 
 app = FastAPI(
@@ -172,6 +186,22 @@ async def db_health():
         session.close()
 
 
+@app.get("/agent/status")
+async def agent_status():
+    """Agent platform health check."""
+    if not agent_client.is_configured:
+        return {"status": "not_configured", "reason": "AGENT_PLATFORM_URL not set"}
+
+    try:
+        healthy = await agent_client.health_check()
+        if healthy:
+            return {"status": "connected", "url": agent_client.base_url}
+        else:
+            return {"status": "unreachable", "url": agent_client.base_url}
+    except Exception as e:
+        return {"status": "error", "reason": str(e), "url": agent_client.base_url}
+
+
 @app.post("/admin/chat/login")
 async def admin_chat_login(request: AdminLoginRequest):
     """Validate admin password for chat admin mode."""
@@ -234,24 +264,51 @@ async def chat_stream(request: ChatRequest):
     # Get user context if user_id provided
     user_context = None
     conversation_history = []
+    agent_data = None
     if request.user_id:
         get_or_create_user(request.user_id)
         user_context = get_user_context(request.user_id)
         # Get this user's conversation history from session storage
         conversation_history = user_sessions.get(request.user_id, [])
 
+        # Fetch enriched context from agent platform (non-blocking, graceful failure)
+        if agent_client.is_configured:
+            try:
+                agent_data = await agent_client.lookup_user_context(request.user_id)
+                if agent_data.get("success"):
+                    print(f"[AGENTS] Got enriched context for user {request.user_id}")
+                else:
+                    print(f"[AGENTS] No agent data for user {request.user_id}: {agent_data.get('error', 'unknown')}")
+                    agent_data = None
+            except Exception as e:
+                print(f"[AGENTS] Error fetching agent data: {e}")
+                agent_data = None
+
     # We need to collect the full response for session storage
     collected_response = []
 
     async def generate():
         try:
+            # Send agent status for admin mode at start of stream
+            if request.is_admin and agent_client.is_configured:
+                agent_status_info = {
+                    "agent_status": "connected" if agent_data and agent_data.get("success") else "no_data",
+                }
+                if agent_data and agent_data.get("success"):
+                    agent_status_info["interest_level"] = agent_data.get("interest_level")
+                    agent_status_info["lead_status"] = agent_data.get("lead_status")
+                    if agent_data.get("enhanced_facts"):
+                        agent_status_info["facts_count"] = len(agent_data["enhanced_facts"])
+                yield f"data: {json.dumps(agent_status_info)}\n\n"
+
             for token in bot.chat_stream(
                 message,
                 conversation_history=conversation_history,
                 user_context=user_context,
                 potential_matches=request.potential_matches,
                 is_admin=request.is_admin,
-                panel_views=request.panel_views
+                panel_views=request.panel_views,
+                agent_data=agent_data
             ):
                 collected_response.append(token)
                 yield f"data: {json.dumps({'token': token})}\n\n"
