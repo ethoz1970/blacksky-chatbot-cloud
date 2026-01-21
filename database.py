@@ -3095,3 +3095,211 @@ def get_hallucination_examples(days: int = 30, limit: int = 20) -> list:
         return []
     finally:
         session.close()
+
+
+# ============================================
+# Handoff Package Functions
+# ============================================
+
+def create_handoff_package(user_id: str) -> dict:
+    """
+    Create comprehensive handoff package for sales team (Mario).
+
+    Consolidates all user context for warm handoff:
+    - Basic user info (name, email, phone, company)
+    - Extracted facts from conversations
+    - User journey timeline
+    - Conversation summary
+    - Intent signals
+    - Suggested approach based on interests
+
+    Returns dict with all handoff context.
+    """
+    session = get_session()
+    if session is None:
+        return {"error": "Database unavailable"}
+
+    try:
+        # Get user
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            return {"error": "User not found"}
+
+        # Get user facts
+        facts = session.query(UserFact).filter(
+            UserFact.user_id == user_id,
+            UserFact.confidence >= 0.6
+        ).all()
+        facts_dict = {f.fact_type: f.fact_value for f in facts}
+
+        # Get most recent conversation with high score
+        best_conversation = (
+            session.query(Conversation)
+            .filter(Conversation.user_id == user_id)
+            .order_by(Conversation.lead_score.desc(), Conversation.created_at.desc())
+            .first()
+        )
+
+        conversation_summary = None
+        lead_score = 1
+        interests = []
+        if best_conversation:
+            conversation_summary = best_conversation.summary
+            lead_score = best_conversation.lead_score or 1
+            if best_conversation.interests:
+                try:
+                    interests = json.loads(best_conversation.interests)
+                except json.JSONDecodeError:
+                    interests = []
+
+        # Get intent signals from user's conversations
+        user_intent_signals = []
+        conversations = session.query(Conversation).filter(
+            Conversation.user_id == user_id,
+            Conversation.messages.isnot(None)
+        ).all()
+
+        for conv in conversations:
+            try:
+                messages = json.loads(conv.messages)
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        content = msg.get("content", "").lower()
+                        for indicator in HIGH_INTENT_INDICATORS:
+                            if indicator in content:
+                                if indicator not in user_intent_signals:
+                                    user_intent_signals.append(indicator)
+            except json.JSONDecodeError:
+                continue
+
+        # Generate suggested approach based on available data
+        suggested_approach = _generate_approach_recommendation(
+            name=user.name,
+            company=user.company or facts_dict.get("company"),
+            role=facts_dict.get("role"),
+            interests=interests,
+            intent_signals=user_intent_signals,
+            lead_score=lead_score
+        )
+
+        return {
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "company": user.company or facts_dict.get("company"),
+                "status": user.status or "new",
+                "first_seen": user.created_at.isoformat() if user.created_at else None,
+                "last_seen": user.last_seen.isoformat() if user.last_seen else None
+            },
+            "facts": facts_dict,
+            "journey": get_user_journey(user_id),
+            "conversation_summary": conversation_summary,
+            "lead_score": lead_score,
+            "interests": interests,
+            "intent_signals": user_intent_signals,
+            "suggested_approach": suggested_approach
+        }
+
+    except Exception as e:
+        print(f"Error creating handoff package: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+    finally:
+        session.close()
+
+
+def _generate_approach_recommendation(
+    name: str = None,
+    company: str = None,
+    role: str = None,
+    interests: list = None,
+    intent_signals: list = None,
+    lead_score: int = 1
+) -> str:
+    """
+    Generate a human-readable approach recommendation for sales.
+    """
+    parts = []
+
+    # Opener based on lead score
+    if lead_score >= 3:
+        parts.append("HIGH PRIORITY LEAD.")
+    elif lead_score >= 2:
+        parts.append("Warm lead with moderate interest.")
+    else:
+        parts.append("Early-stage contact.")
+
+    # Personalization
+    if name and company:
+        parts.append(f"Reach out to {name} at {company}.")
+    elif name:
+        parts.append(f"Follow up with {name}.")
+    elif company:
+        parts.append(f"Contact at {company}.")
+
+    # Role-based approach
+    if role:
+        role_lower = role.lower()
+        if any(x in role_lower for x in ["cto", "ceo", "founder", "owner", "president"]):
+            parts.append("Executive - focus on strategic value and ROI.")
+        elif any(x in role_lower for x in ["engineer", "developer", "architect"]):
+            parts.append("Technical role - emphasize capabilities and integration.")
+        elif any(x in role_lower for x in ["manager", "director", "lead"]):
+            parts.append("Management - discuss team efficiency and timelines.")
+
+    # Intent-based suggestions
+    if intent_signals:
+        if "pricing" in intent_signals or "cost" in intent_signals:
+            parts.append("Asked about pricing - prepare quote or pricing discussion.")
+        if "demo" in intent_signals or "trial" in intent_signals:
+            parts.append("Interested in demo - offer walkthrough.")
+        if "timeline" in intent_signals or "schedule" in intent_signals:
+            parts.append("Asking about timelines - has potential project in mind.")
+
+    # Interest-based suggestions
+    if interests:
+        if any("treasury" in i.lower() for i in interests if i):
+            parts.append("Treasury focus - highlight federal/government experience.")
+        if any("ai" in i.lower() or "automation" in i.lower() for i in interests if i):
+            parts.append("AI/automation interest - show relevant case studies.")
+
+    return " ".join(parts) if parts else "Standard follow-up approach."
+
+
+def get_intent_signals_for_user(user_id: str) -> list:
+    """
+    Get intent signals specific to a user from their conversations.
+    """
+    session = get_session()
+    if session is None:
+        return []
+
+    try:
+        signals = []
+        conversations = session.query(Conversation).filter(
+            Conversation.user_id == user_id,
+            Conversation.messages.isnot(None)
+        ).all()
+
+        for conv in conversations:
+            try:
+                messages = json.loads(conv.messages)
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        content = msg.get("content", "").lower()
+                        for indicator in HIGH_INTENT_INDICATORS:
+                            if indicator in content and indicator not in signals:
+                                signals.append(indicator)
+            except json.JSONDecodeError:
+                continue
+
+        return signals
+
+    except Exception as e:
+        print(f"Error getting intent signals for user: {e}")
+        return []
+    finally:
+        session.close()

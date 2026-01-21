@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 import jwt
 
 from chatbot import BlackskyChatbot
-from config import HOST, PORT, ADMIN_PASSWORD, JWT_SECRET_KEY, CORS_ORIGINS
+from config import HOST, PORT, ADMIN_PASSWORD, JWT_SECRET_KEY, CORS_ORIGINS, AGENT_FAST_TIMEOUT
 from agents import agent_client
 from rag import DocumentStore, DOCS_DIR
 from database import (
@@ -36,7 +36,8 @@ from database import (
     delete_training_example, get_training_stats, export_training_data_jsonl,
     get_training_candidates, create_training_example_from_feedback,
     get_funnel_analytics, get_intent_signals, get_user_journey, get_recent_high_intent_leads,
-    analyze_response_quality, get_quality_metrics, get_flagged_responses, get_hallucination_examples
+    analyze_response_quality, get_quality_metrics, get_flagged_responses, get_hallucination_examples,
+    create_handoff_package, get_intent_signals_for_user
 )
 
 # Paths
@@ -334,24 +335,40 @@ async def chat_stream(request: ChatRequest):
     user_context = None
     conversation_history = []
     agent_data = None
+    agent_task = None
+
     if request.user_id:
         get_or_create_user(request.user_id)
         user_context = get_user_context(request.user_id)
         # Get this user's conversation history from session storage
         conversation_history = user_sessions.get(request.user_id, [])
 
-        # Fetch enriched context from agent platform (non-blocking, graceful failure)
+        # Start agent lookup in background (non-blocking for fast first token)
         if agent_client.is_configured:
-            try:
-                agent_data = await agent_client.lookup_user_context(request.user_id)
-                if agent_data.get("success"):
-                    print(f"[AGENTS] Got enriched context for user {request.user_id}")
-                else:
-                    print(f"[AGENTS] No agent data for user {request.user_id}: {agent_data.get('error', 'unknown')}")
+            # Check cache first for instant response
+            agent_data = agent_client.get_cached(request.user_id)
+            if agent_data:
+                print(f"[AGENTS] Using cached context for user {request.user_id}")
+            else:
+                # Start background fetch
+                agent_task = asyncio.create_task(
+                    agent_client.lookup_user_context(request.user_id)
+                )
+                # Try to get fresh data with short timeout
+                try:
+                    agent_data = await asyncio.wait_for(agent_task, timeout=AGENT_FAST_TIMEOUT)
+                    if agent_data.get("success"):
+                        print(f"[AGENTS] Got enriched context for user {request.user_id}")
+                    else:
+                        print(f"[AGENTS] No agent data for user {request.user_id}: {agent_data.get('error', 'unknown')}")
+                        agent_data = None
+                except asyncio.TimeoutError:
+                    # Continue without agent data - task will complete in background and cache result
+                    print(f"[AGENTS] Fast timeout - streaming without agent data for {request.user_id}")
                     agent_data = None
-            except Exception as e:
-                print(f"[AGENTS] Error fetching agent data: {e}")
-                agent_data = None
+                except Exception as e:
+                    print(f"[AGENTS] Error fetching agent data: {e}")
+                    agent_data = None
 
     # We need to collect the full response for session storage
     collected_response = []
@@ -497,6 +514,32 @@ async def end_conversation(request: ConversationEndRequest):
             conversation_id=conv_id
         )
         print(f"Extracted {len(semantic_facts)} facts, saved {facts_saved} for user {request.user_id}")
+
+    # Notify agent platform of lead capture (non-blocking background task)
+    if agent_client.is_configured and (email or phone or lead_score >= 2):
+        asyncio.create_task(
+            agent_client.notify_lead_captured(
+                user_id=request.user_id,
+                lead_data={
+                    "name": name,
+                    "email": email,
+                    "phone": phone,
+                    "company": company,
+                    "interest_level": "hot" if lead_score >= 3 else "warm" if lead_score >= 2 else "cold",
+                    "conversation_summary": summary
+                }
+            )
+        )
+
+    # Trigger company research if company detected (non-blocking)
+    if agent_client.is_configured and company:
+        asyncio.create_task(
+            agent_client.trigger_company_research(
+                user_id=request.user_id,
+                company_name=company,
+                context=f"Lead from chat - {name or 'Unknown'}"
+            )
+        )
 
     return {
         "status": status,
@@ -2325,6 +2368,123 @@ async def analyze_single_response(password: str = Query(...), user_message: str 
 
     analysis = analyze_response_quality(user_message, assistant_response)
     return analysis
+
+
+# ============================================
+# Lead Handoff & Agent Integration Endpoints
+# ============================================
+
+@app.post("/admin/leads/{user_id}/draft-email")
+async def draft_lead_email(user_id: str, password: str = Query(...)):
+    """Generate personalized cold email draft for a lead using agent platform."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not agent_client.is_configured:
+        raise HTTPException(status_code=503, detail="Agent platform not configured")
+
+    # Get user context for email generation
+    user_context = get_user_context(user_id)
+    if not user_context:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Get handoff package for rich context
+    handoff = create_handoff_package(user_id)
+
+    # Draft email via agent platform
+    email_result = await agent_client.draft_cold_email(
+        company_name=handoff.get("user", {}).get("company") or "your company",
+        contact_name=handoff.get("user", {}).get("name"),
+        contact_role=handoff.get("facts", {}).get("role"),
+        context=f"""
+Lead context:
+- Interests: {', '.join(handoff.get('interests', [])) or 'Not specified'}
+- Intent signals: {', '.join(handoff.get('intent_signals', [])) or 'None detected'}
+- Conversation summary: {handoff.get('conversation_summary', 'No previous conversation')}
+- Suggested approach: {handoff.get('suggested_approach', 'Standard follow-up')}
+"""
+    )
+
+    if not email_result.get("success"):
+        raise HTTPException(status_code=500, detail=f"Email draft failed: {email_result.get('error')}")
+
+    return {
+        "draft": email_result.get("email_draft") or email_result.get("draft"),
+        "subject": email_result.get("subject"),
+        "user_context": {
+            "name": handoff.get("user", {}).get("name"),
+            "company": handoff.get("user", {}).get("company"),
+            "email": handoff.get("user", {}).get("email")
+        }
+    }
+
+
+@app.get("/admin/leads/{user_id}/handoff")
+async def get_lead_handoff(user_id: str, password: str = Query(...)):
+    """Get comprehensive handoff package for a lead."""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    handoff = create_handoff_package(user_id)
+    if handoff.get("error"):
+        raise HTTPException(status_code=404, detail=handoff["error"])
+
+    return handoff
+
+
+@app.post("/admin/leads/{user_id}/notify-handoff")
+async def notify_lead_handoff(
+    user_id: str,
+    password: str = Query(...),
+    channel: str = Query("agent")  # "agent", "slack", "email"
+):
+    """
+    Notify sales team of lead ready for handoff.
+
+    Channels:
+    - agent: Notify agent platform (default)
+    - slack: Send Slack notification (if configured)
+    - email: Send email notification (if configured)
+    """
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    handoff = create_handoff_package(user_id)
+    if handoff.get("error"):
+        raise HTTPException(status_code=404, detail=handoff["error"])
+
+    notifications_sent = []
+
+    # Notify agent platform
+    if channel == "agent" and agent_client.is_configured:
+        result = await agent_client.notify_lead_captured(
+            user_id=user_id,
+            lead_data={
+                "name": handoff.get("user", {}).get("name"),
+                "email": handoff.get("user", {}).get("email"),
+                "phone": handoff.get("user", {}).get("phone"),
+                "company": handoff.get("user", {}).get("company"),
+                "interest_level": "hot" if handoff.get("lead_score", 1) >= 3 else "warm",
+                "conversation_summary": handoff.get("conversation_summary"),
+                "notes": handoff.get("suggested_approach")
+            }
+        )
+        if result.get("success"):
+            notifications_sent.append("agent_platform")
+
+    # Update lead status to indicate handoff initiated
+    update_lead_status(user_id, "contacted")
+
+    return {
+        "status": "handoff_initiated",
+        "notifications_sent": notifications_sent,
+        "handoff_summary": {
+            "name": handoff.get("user", {}).get("name"),
+            "company": handoff.get("user", {}).get("company"),
+            "lead_score": handoff.get("lead_score"),
+            "suggested_approach": handoff.get("suggested_approach")
+        }
+    }
 
 
 @app.get("/admin/quality-dashboard")
