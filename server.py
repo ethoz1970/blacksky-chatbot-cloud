@@ -30,6 +30,10 @@ from database import (
     verify_hard_login, get_all_exchanges, save_user_facts, get_user_facts
 )
 
+# Import testing routes if enabled
+import os
+ENABLE_TEST_ENDPOINTS = os.getenv("ENABLE_TEST_ENDPOINTS", "false").lower() == "true"
+
 # Paths
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(exist_ok=True)
@@ -72,6 +76,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include testing routes if enabled
+if ENABLE_TEST_ENDPOINTS:
+    from routes.testing import router as testing_router
+    app.include_router(testing_router)
+    print("[SERVER] Testing endpoints enabled at /testing/*")
 
 
 # JWT token utilities

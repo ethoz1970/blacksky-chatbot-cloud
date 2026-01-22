@@ -1,0 +1,129 @@
+version: '3.8'
+
+# =============================================================================
+# Maurice Ife Testing - Docker Compose Configuration
+# =============================================================================
+# This configuration sets up Maurice with all dependencies for Ife integration
+# testing, including PostgreSQL for persistent storage and optional Qdrant
+# for local vector search.
+# =============================================================================
+
+services:
+  # Main Maurice application
+  maurice-ife:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maurice-ife-testing
+    ports:
+      - "${PORT:-8001}:8001"
+    environment:
+      - ENVIRONMENT=ife-testing
+      - DEBUG=true
+      - PORT=8001
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgresql://maurice:maurice_dev_password@postgres:5432/maurice_ife_testing
+      - ENABLE_TEST_ENDPOINTS=true
+      - ENABLE_VERBOSE_LOGGING=true
+      - LOG_ALL_CONVERSATIONS=true
+      - LOG_RAG_RETRIEVALS=true
+      - CONVERSATION_LOG_PATH=/app/logs/conversations
+      - IFE_TESTING_MODE=true
+      - DISABLE_AUTH=true
+      - ADMIN_PASSWORD=ife-testing
+    env_file:
+      - .env.local
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./documents:/app/documents
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - maurice-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: maurice-ife-postgres
+    environment:
+      POSTGRES_DB: maurice_ife_testing
+      POSTGRES_USER: maurice
+      POSTGRES_PASSWORD: maurice_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - maurice-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maurice -d maurice_ife_testing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Local Qdrant for vector search (if not using Pinecone)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: maurice-ife-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - maurice-network
+    restart: unless-stopped
+    profiles:
+      - with-qdrant
+
+  # Optional: Redis for caching (future use)
+  redis:
+    image: redis:7-alpine
+    container_name: maurice-ife-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - maurice-network
+    restart: unless-stopped
+    profiles:
+      - with-redis
+
+  # Optional: Adminer for database management
+  adminer:
+    image: adminer:latest
+    container_name: maurice-ife-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    networks:
+      - maurice-network
+    depends_on:
+      - postgres
+    profiles:
+      - with-adminer
+
+networks:
+  maurice-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  redis_data:
+    driver: local

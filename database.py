@@ -1078,3 +1078,401 @@ def delete_user_fact(fact_id: int) -> bool:
         return False
     finally:
         session.close()
+
+
+# ============================================
+# Ife Testing Models and Functions
+# ============================================
+
+class ConversationLog(Base):
+    """Detailed conversation logs for Ife testing analysis."""
+    __tablename__ = "conversation_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conversation_id = Column(String(255), nullable=False, index=True)
+    turn_number = Column(Integer, default=1)
+    user_message = Column(Text, nullable=False)
+    assistant_response = Column(Text, nullable=False)
+    rag_results = Column(Text, nullable=True)  # JSON
+    metadata = Column(Text, nullable=True)  # JSON
+    response_time_ms = Column(Float, nullable=True)
+    quality_score = Column(Float, nullable=True)
+    scenario_id = Column(String(255), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WeakPoint(Base):
+    """Weak points identified in Maurice's responses."""
+    __tablename__ = "weak_points"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conversation_id = Column(String(255), nullable=False, index=True)
+    conversation_log_id = Column(Integer, ForeignKey("conversation_logs.id"), nullable=True)
+    turn_number = Column(Integer, default=1)
+    weak_point_type = Column(String(100), nullable=False, index=True)
+    severity = Column(String(50), default="medium", index=True)
+    context = Column(Text, nullable=True)
+    user_query = Column(Text, nullable=False)
+    assistant_response = Column(Text, nullable=False)
+    suggested_improvement = Column(Text, nullable=True)
+    reviewed = Column(String(5), default="false", index=True)  # SQLite doesn't have bool
+    reviewer_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
+
+
+class FineTuningExample(Base):
+    """Curated examples for model fine-tuning."""
+    __tablename__ = "fine_tuning_examples"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    weak_point_id = Column(Integer, ForeignKey("weak_points.id"), nullable=True)
+    conversation_log_id = Column(Integer, ForeignKey("conversation_logs.id"), nullable=True)
+    messages = Column(Text, nullable=False)  # JSON array
+    system_prompt = Column(Text, nullable=True)
+    approved = Column(String(5), default="false", index=True)
+    approval_notes = Column(Text, nullable=True)
+    quality_rating = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
+    approved_by = Column(String(255), nullable=True)
+
+
+class TestScenario(Base):
+    """Predefined test scenarios for systematic testing."""
+    __tablename__ = "test_scenarios"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scenario_id = Column(String(255), unique=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(100), nullable=True, index=True)
+    test_messages = Column(Text, nullable=False)  # JSON array
+    expected_behaviors = Column(Text, nullable=True)  # JSON
+    active = Column(String(5), default="true", index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TestRun(Base):
+    """Results of test scenario runs."""
+    __tablename__ = "test_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String(255), unique=True, nullable=False)
+    scenario_id = Column(String(255), nullable=True, index=True)
+    status = Column(String(50), default="running", index=True)
+    total_tests = Column(Integer, default=0)
+    passed_tests = Column(Integer, default=0)
+    failed_tests = Column(Integer, default=0)
+    avg_quality_score = Column(Float, nullable=True)
+    avg_response_time_ms = Column(Float, nullable=True)
+    results = Column(Text, nullable=True)  # JSON
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+# Ife Testing Database Functions
+
+def save_conversation_log(
+    conversation_id: str,
+    user_message: str,
+    assistant_response: str,
+    rag_results: list = None,
+    metadata: dict = None,
+    response_time_ms: float = None,
+    quality_score: float = None,
+    scenario_id: str = None,
+    turn_number: int = 1
+) -> Optional[int]:
+    """Save a conversation log entry. Returns log ID."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        log = ConversationLog(
+            conversation_id=conversation_id,
+            turn_number=turn_number,
+            user_message=user_message,
+            assistant_response=assistant_response,
+            rag_results=json.dumps(rag_results) if rag_results else None,
+            metadata=json.dumps(metadata) if metadata else None,
+            response_time_ms=response_time_ms,
+            quality_score=quality_score,
+            scenario_id=scenario_id
+        )
+        session.add(log)
+        session.commit()
+        return log.id
+    except Exception as e:
+        print(f"Error saving conversation log: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
+def save_weak_point(
+    conversation_id: str,
+    weak_point_type: str,
+    user_query: str,
+    assistant_response: str,
+    severity: str = "medium",
+    context: str = None,
+    suggested_improvement: str = None,
+    conversation_log_id: int = None,
+    turn_number: int = 1
+) -> Optional[int]:
+    """Save a weak point. Returns weak point ID."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        wp = WeakPoint(
+            conversation_id=conversation_id,
+            conversation_log_id=conversation_log_id,
+            turn_number=turn_number,
+            weak_point_type=weak_point_type,
+            severity=severity,
+            context=context,
+            user_query=user_query,
+            assistant_response=assistant_response,
+            suggested_improvement=suggested_improvement
+        )
+        session.add(wp)
+        session.commit()
+        return wp.id
+    except Exception as e:
+        print(f"Error saving weak point: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
+def get_weak_points_db(
+    limit: int = 100,
+    severity: str = None,
+    weak_point_type: str = None,
+    reviewed: bool = None
+) -> list:
+    """Get weak points from database with optional filtering."""
+    session = get_session()
+    if session is None:
+        return []
+
+    try:
+        query = session.query(WeakPoint).order_by(WeakPoint.created_at.desc())
+
+        if severity:
+            query = query.filter(WeakPoint.severity == severity)
+        if weak_point_type:
+            query = query.filter(WeakPoint.weak_point_type == weak_point_type)
+        if reviewed is not None:
+            query = query.filter(WeakPoint.reviewed == ("true" if reviewed else "false"))
+
+        weak_points = query.limit(limit).all()
+
+        return [
+            {
+                "id": wp.id,
+                "conversation_id": wp.conversation_id,
+                "turn_number": wp.turn_number,
+                "weak_point_type": wp.weak_point_type,
+                "severity": wp.severity,
+                "context": wp.context,
+                "user_query": wp.user_query,
+                "assistant_response": wp.assistant_response,
+                "suggested_improvement": wp.suggested_improvement,
+                "reviewed": wp.reviewed == "true",
+                "created_at": wp.created_at.isoformat() if wp.created_at else None
+            }
+            for wp in weak_points
+        ]
+    except Exception as e:
+        print(f"Error getting weak points: {e}")
+        return []
+    finally:
+        session.close()
+
+
+def save_fine_tuning_example(
+    messages: list,
+    weak_point_id: int = None,
+    conversation_log_id: int = None,
+    system_prompt: str = None
+) -> Optional[int]:
+    """Save a fine-tuning example. Returns example ID."""
+    session = get_session()
+    if session is None:
+        return None
+
+    try:
+        example = FineTuningExample(
+            weak_point_id=weak_point_id,
+            conversation_log_id=conversation_log_id,
+            messages=json.dumps(messages),
+            system_prompt=system_prompt
+        )
+        session.add(example)
+        session.commit()
+        return example.id
+    except Exception as e:
+        print(f"Error saving fine-tuning example: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+
+def get_fine_tuning_examples_db(approved_only: bool = False, limit: int = 100) -> list:
+    """Get fine-tuning examples from database."""
+    session = get_session()
+    if session is None:
+        return []
+
+    try:
+        query = session.query(FineTuningExample).order_by(FineTuningExample.created_at.desc())
+
+        if approved_only:
+            query = query.filter(FineTuningExample.approved == "true")
+
+        examples = query.limit(limit).all()
+
+        return [
+            {
+                "id": ex.id,
+                "weak_point_id": ex.weak_point_id,
+                "messages": json.loads(ex.messages) if ex.messages else [],
+                "system_prompt": ex.system_prompt,
+                "approved": ex.approved == "true",
+                "quality_rating": ex.quality_rating,
+                "created_at": ex.created_at.isoformat() if ex.created_at else None
+            }
+            for ex in examples
+        ]
+    except Exception as e:
+        print(f"Error getting fine-tuning examples: {e}")
+        return []
+    finally:
+        session.close()
+
+
+def approve_fine_tuning_example_db(example_id: int, approved_by: str = None, notes: str = None) -> bool:
+    """Approve a fine-tuning example."""
+    session = get_session()
+    if session is None:
+        return False
+
+    try:
+        example = session.query(FineTuningExample).filter(FineTuningExample.id == example_id).first()
+        if example:
+            example.approved = "true"
+            example.approved_at = datetime.utcnow()
+            example.approved_by = approved_by
+            if notes:
+                example.approval_notes = notes
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error approving fine-tuning example: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+
+def get_ife_testing_metrics() -> dict:
+    """Get aggregate metrics for Ife testing."""
+    session = get_session()
+    if session is None:
+        return {}
+
+    try:
+        # Count conversation logs
+        total_logs = session.query(ConversationLog).count()
+
+        # Average quality score
+        logs_with_quality = session.query(ConversationLog).filter(
+            ConversationLog.quality_score.isnot(None)
+        ).all()
+        avg_quality = 0
+        if logs_with_quality:
+            scores = [l.quality_score for l in logs_with_quality]
+            avg_quality = sum(scores) / len(scores)
+
+        # Weak points counts
+        total_weak_points = session.query(WeakPoint).count()
+        high_severity = session.query(WeakPoint).filter(WeakPoint.severity == "high").count()
+        medium_severity = session.query(WeakPoint).filter(WeakPoint.severity == "medium").count()
+        low_severity = session.query(WeakPoint).filter(WeakPoint.severity == "low").count()
+
+        # Weak points by type
+        weak_point_types = session.query(
+            WeakPoint.weak_point_type
+        ).distinct().all()
+        type_counts = {}
+        for (wp_type,) in weak_point_types:
+            count = session.query(WeakPoint).filter(WeakPoint.weak_point_type == wp_type).count()
+            type_counts[wp_type] = count
+
+        # Fine-tuning examples
+        total_examples = session.query(FineTuningExample).count()
+        approved_examples = session.query(FineTuningExample).filter(
+            FineTuningExample.approved == "true"
+        ).count()
+
+        return {
+            "total_conversation_logs": total_logs,
+            "avg_quality_score": round(avg_quality, 3),
+            "total_weak_points": total_weak_points,
+            "weak_points_by_severity": {
+                "high": high_severity,
+                "medium": medium_severity,
+                "low": low_severity
+            },
+            "weak_points_by_type": type_counts,
+            "fine_tuning_examples": {
+                "total": total_examples,
+                "approved": approved_examples
+            }
+        }
+    except Exception as e:
+        print(f"Error getting Ife testing metrics: {e}")
+        return {}
+    finally:
+        session.close()
+
+
+def clear_ife_testing_data() -> dict:
+    """Clear all Ife testing data. Returns counts of deleted records."""
+    session = get_session()
+    if session is None:
+        return {}
+
+    try:
+        # Get counts before deletion
+        logs_count = session.query(ConversationLog).count()
+        wp_count = session.query(WeakPoint).count()
+        ft_count = session.query(FineTuningExample).count()
+
+        # Delete all records
+        session.query(FineTuningExample).delete()
+        session.query(WeakPoint).delete()
+        session.query(ConversationLog).delete()
+        session.commit()
+
+        return {
+            "conversation_logs_deleted": logs_count,
+            "weak_points_deleted": wp_count,
+            "fine_tuning_examples_deleted": ft_count
+        }
+    except Exception as e:
+        print(f"Error clearing Ife testing data: {e}")
+        session.rollback()
+        return {}
+    finally:
+        session.close()

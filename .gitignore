@@ -1,16 +1,58 @@
 # Environment
 .env
+.env.local
+.env.production
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # OS
-.DS_Storevenv/
-__pycache__/
 .DS_Store
+Thumbs.db
+
+# Models and data
 models/
 chroma_db/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+maurice.db
+maurice_ife_testing.db
+
+# Logs
+logs/
+*.log
+
+# Data directories
+data/
+fine-tuning/
+
+# Docker
+docker-compose.override.yml
+
+# Testing artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Secrets (never commit these!)
+*.pem
+*.key
+credentials.json
+service-account.json
